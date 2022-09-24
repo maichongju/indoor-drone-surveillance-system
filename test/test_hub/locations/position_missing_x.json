@@ -1,0 +1,17 @@
+[
+  {
+    "name": "Front Door",
+    "position": {
+      "y": 0,
+      "z": 0
+    }
+  },
+  {
+    "name": "Back Door",
+    "position": {
+      "x": 1,
+      "y": 1,
+      "z": 1
+    }
+  }
+]

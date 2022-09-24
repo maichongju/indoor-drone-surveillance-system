@@ -1,0 +1,250 @@
+from importlib.resources import path
+from testfixtures import LogCapture
+
+import logging
+from config.config import Config, ConfigDefault, ConfigError
+
+import pytest
+
+CONFIGROOT = "test/test_config/configs/"
+
+
+def get_path(filename: str) -> str:
+    return CONFIGROOT + filename
+
+
+class TestConfigLogging():
+    def test_invalid_file_path(self):
+        path = 'invalid path'
+        with pytest.raises(FileNotFoundError):
+            Config(path)
+
+    def test_missing_logging(self):
+        path = get_path('logging_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getValue('logging') == ConfigDefault.LOGGING.value
+
+    def test_missing_logging_enable(self):
+        path = get_path('logging_enable_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getLoggingValue(
+                'enable') == ConfigDefault.LOGGING_ENABLE.value
+
+    def test_invalid_logging_enable(self):
+        path = get_path('logging_enable_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getLoggingValue(
+                'enable') == ConfigDefault.LOGGING_ENABLE.value
+
+    def test_missing_logging_level(self):
+        path = get_path('logging_level_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getLoggingValue(
+                'level') == ConfigDefault.LOGGING_LEVEL.value
+
+    def test_invalid_logging_level(self):
+        path = get_path('logging_level_invalid.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno, logging.WARNING
+            assert config.getLoggingValue(
+                'level') == ConfigDefault.LOGGING_LEVEL.value
+
+    def test_missing_logging_file_name(self):
+        path = get_path('logging_file_name_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert config.getLoggingValue(
+                'file_name') == ConfigDefault.LOGGING_FILE_NAME.value
+
+    def test_invalid_logging_file_name(self):
+        path = get_path('logging_file_name_invalid.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getLoggingValue(
+                'file_name') == ConfigDefault.LOGGING_FILE_NAME.value
+
+
+class TestConfigServer():
+
+    def test_missing_server(self):
+        path = get_path('server_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert len(l.records) == 0
+            assert config.getSeverValue(
+                'enable') == ConfigDefault.SERVER_ENABLE.value
+
+    def test_missing_server_enable(self):
+        path = get_path('server_enable_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno, logging.WARNING
+            assert config.getSeverValue(
+                'enable') == ConfigDefault.SERVER_ENABLE.value
+
+    def test_invalid_server_enable(self):
+        path = get_path('server_enable_invalid.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getSeverValue(
+                'enable') == ConfigDefault.SERVER_ENABLE.value
+
+    def test_missing_server_host(self):
+        path = get_path('server_host_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getSeverValue(
+                'enable') == ConfigDefault.SERVER_ENABLE.value
+
+    def test_invalid_server_host(self):
+        path = get_path('server_host_invalid.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getSeverValue(
+                'enable') == ConfigDefault.SERVER_ENABLE.value
+
+    def test_missing_server_port(self):
+        path = get_path('server_port_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getSeverValue(
+                'enable') == ConfigDefault.SERVER_ENABLE.value
+
+    def test_invalid_server_port(self):
+        path = get_path('server_port_invalid.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getSeverValue(
+                'enable') == ConfigDefault.SERVER_ENABLE.value
+
+    def test_missing_server_debug(self):
+        path = get_path('server_debug_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert len(l.records) == 0
+            assert config.getSeverValue(
+                'debug') == ConfigDefault.SERVER_DEBUG.value
+
+    def test_invalid_server_debug(self):
+        path = get_path('server_debug_invalid.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getSeverValue(
+                'debug') == ConfigDefault.SERVER_DEBUG.value
+
+    def test_missing_server_log_file(self):
+        path = get_path('server_log_file_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert len(l.records) == 0
+            assert config.getSeverValue(
+                'log_file') == ConfigDefault.SERVER_LOG_FILE.value
+
+    def test_invalid_server_log_file(self):
+        path = get_path('server_log_file_invalid.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getSeverValue(
+                'log_file') == ConfigDefault.SERVER_LOG_FILE.value
+
+
+class TestConfigDrone():
+    def test_valid_drone(self):
+        path = get_path('valid_config.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert len(l.records) == 0
+            drone = {
+                "drone1": {
+                    "name": "drone1",
+                    "uri": "radio://0/80/2M/E7E7E7E702",
+                    "stream": "192.168.0.1"
+                },
+                "drone2": {
+                    "name": "drone2",
+                    "uri": "radio://0/80/2M/E7E7E7E703",
+                    "stream": "192.168.0.1"
+                }
+            }
+            assert config.getDrone() == drone
+
+    def test_missing_drone(self):
+        path = get_path('drone_missing.toml')
+        with pytest.raises(ConfigError):
+            Config(path)
+
+    def test_missing_drone_name(self):
+        path = get_path('drone_name_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert config.getDrone()['drone1']['name'] == 'drone1'
+
+    def test_invalid_drone_name(self):
+        path = get_path('drone_name_invalid.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert len(l.records) == 0
+            assert config.getDrone()['drone1']['name'] == '123456'
+
+    def test_disable_drone(self):
+        path = get_path('drone_disable.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert len(l.records) == 0
+            assert len(config.getDrone()) == 0
+
+    def test_missing_uri(self):
+        path = get_path('drone_uri_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert len(config.getDrone()) == 0
+
+    def test_missing_stream(self):
+        path = get_path('drone_stream_missing.toml')
+        with LogCapture() as l:
+            config = Config(path)
+            config.displayErrorMessages()
+            assert l.records[0].levelno == logging.WARNING
+            assert len(config.getDrone()) == 0

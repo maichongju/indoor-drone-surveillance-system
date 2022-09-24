@@ -1,0 +1,50 @@
+from copy import deepcopy
+from hub.location import Locations
+from general.utils import Position
+import pytest
+
+
+from unittest import TestCase
+
+PATH = 'test/test_hub/locations/'
+
+def get_path(file_name):
+    return PATH + file_name
+
+class TestLocations(TestCase):
+    
+    def test_normal(self):
+        location = Locations(get_path('locations.json'))
+        self.assertEqual(len(location.locations), 2)
+        self.assertEqual(location.locations[0].name, 'Front Door')
+        self.assertEqual(location.locations[0].position, Position(0,0,0))
+        self.assertEqual(location.locations[1].name, 'Back Door')
+        self.assertEqual(location.locations[1].position, Position(1,1,1))
+    
+    def test_not_list(self):
+        location = Locations(get_path('not_list.json'))
+        self.assertEqual(len(location.locations), 0)
+        
+    def test_missing_name(self):
+        location = Locations(get_path('missing_name.json'))
+        self.assertEqual(len(location.locations), 1)
+        
+    def test_position_invalid(self):
+        location = Locations(get_path('position_invalid.json'))
+        self.assertEqual(len(location.locations), 1)
+        
+    def test_position_missing_x(self):
+        location = Locations(get_path('position_missing_x.json'))
+        self.assertEqual(len(location.locations), 1)
+        
+    def test_position_x_invalid(self):
+        location = Locations(get_path('position_x_invalid.json'))
+        self.assertEqual(len(location.locations), 1)
+        
+    def test_deepcopy(self):
+        location = Locations(get_path('locations.json'))
+        location_ = deepcopy(location)
+        location._locations[0].name = 'Changed'
+        self.assertEqual(location_._locations[0].name, 'Front Door')
+        
+    

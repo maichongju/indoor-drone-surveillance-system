@@ -1,0 +1,31 @@
+
+[logging]
+# Enable logging
+enable = true
+# Must be one of the following string
+# CRITICAL, ERROR, WARNING, INFO, DEBUG
+level = 'DEBUG'
+file_name = 'log.log'
+
+
+[server]
+# Enable online server (bool)
+enable = true
+# The hostname or IP address of the server
+host = 'localhost'
+# The port of the server
+port = 8080
+log_file = 'flask.log'
+# debug = false
+[drone]
+
+[drone.drone1]
+name = "drone1"
+uri = "radio://0/80/2M/E7E7E7E702"
+stream = "192.168.0.1"
+
+[drone.drone2]
+name = "drone2"
+uri = "radio://0/80/2M/E7E7E7E703"
+stream = "192.168.0.1"
+

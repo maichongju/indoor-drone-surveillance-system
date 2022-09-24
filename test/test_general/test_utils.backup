@@ -1,0 +1,28 @@
+from general.utils import Position
+
+from unittest import TestCase
+
+
+class TestPosition(TestCase):
+    def test_add_position(self):
+        p1 = Position(0,0,0)
+        p2 = Position(1,1,1)
+        self.assertEqual(p1 + p2, Position(1,1,1))
+    
+    def test_add_int(self):
+        p1 = Position(0,0,0)
+        self.assertEqual(p1 + 1, Position(1,1,1))
+
+    def test_sub_position(self):
+        p1 = Position(0,0,0)
+        p2 = Position(1,1,1)
+        self.assertEqual(p1 - p2, Position(-1,-1,-1))
+    
+    def test_sub_int(self):
+        p1 = Position(0,0,0)
+        self.assertEqual(p1 - 1, Position(-1,-1,-1))
+        
+    def test_distance(self):
+        p1 = Position(0,0,0)
+        p2 = Position(1,1,1)
+        self.assertEqual(p1.distance(p2), 3 ** 0.5)

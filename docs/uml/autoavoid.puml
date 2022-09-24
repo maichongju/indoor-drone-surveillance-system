@@ -1,0 +1,26 @@
+@startuml
+start
+
+while (each direction (front, rear, left, right))
+
+    if (distance) is (< avoidance_distance) then
+        :velocity = abs(distance - avoidance_distance) / (avoidance_distance - min_distance) * auto_avoidance_velocity;
+    endif
+
+endwhile
+
+#Yellow:TODO Process different directions;
+
+if (avoidance?) is (yes) then
+    
+    if (fly mode) is (Hover) then 
+        :Set fly mode to Flying;
+        :Set previous fly mode to Hover;
+    endif
+else (no)
+    if (previous mode) is (Hover) then
+        :Set previous mode to None;
+        :Set fly mode to Hover;
+    endif
+endif
+:return modified motion;

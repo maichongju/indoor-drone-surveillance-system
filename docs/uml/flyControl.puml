@@ -1,0 +1,52 @@
+@startuml
+start
+repeat :get command;
+    if (command?) then (TERMINATE)
+        #pink:stop;
+        kill
+    elseif (command?) then (ManullyCommand)
+        : Convert to Motion;
+    elseif (command?) then (Motion)
+        : Set to Motion;
+    else (Invalid)
+        #Darkorange:Discard;
+        :Default motion;
+    endif
+
+    if (flying?) then (yes)
+        if (thrust normal?) then (no)
+            : Something wrong 
+            with the thrust;
+            #pink:stop;
+            kill
+        else (yes)
+            if (FlyControlMode?) then(Manually)
+                if (TimeEclapsed?) is (< HoldTime) then
+                    : Keep the current Motion;
+                else (>= Holdtime)
+                    : Set Motion to zero;
+                endif
+
+            else (Auto)
+                :Todo;
+            endif 
+            if (FlyMode) is (Hover) then 
+                note left
+                Hover Mode discard all input
+                end note
+                :Calculate movement correction
+                Set Motion to correction value                ;
+            endif
+            
+            if (Auto Avoid?) is (Enable) then
+                :Calculate the correction velocity;
+                :Modify the Motion 
+                with the correction value;
+            endif        
+        endif
+    endif
+    :Send Motion to the drone;  
+ 
+
+
+@enduml

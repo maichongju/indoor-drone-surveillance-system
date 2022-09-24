@@ -1,0 +1,47 @@
+@startuml
+start
+note left
+fly mode must be go to location
+endnote
+note right 
+From Fly Control
+endnote
+if (drone reach location) then (no)
+
+    partition "Axis Alignment" {
+    if (state) is (""REQUIRE_INIT"") then
+
+        :set drone align with Y axis;
+        :Change state to 'AXIS_CHANGING';
+        else if (state)then (""REQUIRE_AXIS_CHANGE"")
+            : target axis = target_axis == Y ? X : Y;
+
+        endif 
+
+        if (state) is (AXIS_CHANGING) then
+            :Rotate drone to target axis;
+            note left
+            Rotate Speed do not 
+            exceed max yaw value
+            endnote
+
+            if (drone aligned with target axis) then
+                :Change state to ""MOVING""";
+            else (no)
+            endif
+
+        endif
+    }
+
+    partition "Drone Movement" {
+        if (state) is (""MOVING"") then
+
+        endif
+    }
+else (yes)
+
+    :set fly mode to ""hover"";
+
+endif
+
+

@@ -1,0 +1,30 @@
+[logging]
+# Enable logging
+enable = 123
+# Must be one of the following string
+# CRITICAL, ERROR, WARNING, INFO, DEBUG
+level = 'DRONE'
+file_name = "log.log"
+
+
+[GUI]
+# Enable the GUI interface 
+enable = true
+
+[server]
+# The hostname or IP address of the server
+host = 'localhost'
+# The port of the server
+port = 8080
+[drone]
+
+[drone.drone1]
+name = "drone1"
+uri = "radio://0/80/2M/E7E7E7E702"
+stream = "192.168.0.1"
+
+[drone.drone2]
+name = "drone2"
+uri = "radio://0/80/2M/E7E7E7E703"
+stream = "192.168.0.1"
+

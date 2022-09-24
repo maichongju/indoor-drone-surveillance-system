@@ -1,0 +1,20 @@
+cflib
+tomli
+pyqt6
+testfixtures
+flask
+QtAwesome
+jsonpickle
+pytest
+pytest-qt
+sympy
+
+
+# pytorch with cuda
+torch --extra-index-url https://download.pytorch.org/whl/cu113
+torchvision --extra-index-url https://download.pytorch.org/whl/cu113
+torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
+
+
+# yolov5
+-r 'ml\models\yolov5\requirements.txt'

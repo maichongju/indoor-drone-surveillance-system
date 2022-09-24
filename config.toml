@@ -1,0 +1,45 @@
+debug = true
+# Dump the raw flight data to a file
+dump_flight_data = true
+
+[drone]
+
+[drone.drone1]
+name = "drone1"
+uri = "radio://0/80/2M/E7E7E7E702"
+stream = "camera"
+
+[drone.drone2]
+name = "drone2"
+uri = "radio://0/80/2M/E7E7E7E703"
+stream = "http://192.168.0.193:8080/?action=stream"
+# enable = true
+
+[drone.drone3]
+name = "Default"
+uri = "radio://0/80/2M/E7E7E7E7E7"
+stream = "camera"
+
+[logging]
+# Enable logging
+enable = true
+# Must be one of the following string
+# CRITICAL, ERROR, WARNING, INFO, DEBUG
+level = 'DEBUG'
+log_file = 'logs\client.log'
+
+
+[gui]
+# Enable the GUI interface 
+debug = true
+show_on_start = true
+
+[server]
+# Enable online server (bool)
+enable = false
+# The hostname or IP address of the server
+host = 'localhost'
+# The port of the server
+port = 8080
+log_file = 'logs\flask.log'
+debug = true

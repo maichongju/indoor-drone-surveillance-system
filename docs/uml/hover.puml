@@ -1,0 +1,32 @@
+@startuml
+' start
+' :Initialize to hover_correction to Motion.zero;
+' while (for x,y,z)
+'     : distance = current_position - hover_position;
+'     if (distance) is (> max distance) then
+'         :velocity = max velocity;
+'     else
+'         if (distance) is (> min distance) then
+'             :velocity = min_velocity + (max_velocity - min_velocity) * (ditance - min_distance) 
+'             / (max_distance - min_distance);
+'         else (< min distance)
+'             :distance below min distance.
+'             No action require;
+        
+'         endif
+
+'     endif
+'     if (distance) is (>0) then
+'         note right
+'         opposite sign of the direction to correct the offset
+'         endnote
+'         :velocity = -velocity;
+'     endif
+' endwhile
+' :Return hover_correction;
+
+
+start
+:Find direction vector of the drone 
+in global;
+:Find the area of the margin error; 
