@@ -277,6 +277,10 @@ class Drone:
         self._video_stream = VideoStream(
             stream_url, stream_resolution)
 
+        # Take off and land callbacks
+        self.fly_control.take_off_cb.add_callback(lambda: self._logger_callbacks.drone_status_callback.call(
+            FlyStatus.FLYING))
+
         self._warning = DroneWarning()
 
         self.is_low_voltage = False
@@ -478,8 +482,7 @@ class Drone:
                 FlyStatus.TAKING_OFF)
             self.fly_control.take_off()
             LOGGER.debug(str(self) + " taking off")
-            self._logger_callbacks.drone_status_callback.call(
-                FlyStatus.FLYING)
+
         except Exception as e:
             raise DroneException(str(e))
 
@@ -705,6 +708,13 @@ class FlyControlDistance:
     yaw_min_correction_degree: VariableCallback = field(
         default_factory=lambda: VariableCallback(1))
 
+    # type float
+    take_off_height: VariableCallback = field(
+        default_factory=lambda: VariableCallback(0.4))
+    
+    landing_cutoff_height: VariableCallback = field(
+        default_factory=lambda: VariableCallback(0.1))
+
 
 @dataclass(frozen=True)
 class FlyControlSetting:
@@ -791,6 +801,11 @@ class FlyControl:
         self._velocity = velocity
         self._yaw_rate = yaw_rate
 
+        self.take_off_cb = Caller()
+        self.land_cb = Caller()
+        
+        self.land_cb.add_callback(self._land_cb)
+
     def take_off(self, height: float = None, time_out: float = 5):
         """ take off the drone. If the drone did not reach the target height after `time_out` seconds,
         it will use the current height as the target height. If the current height is lower than 0.1 meter, 
@@ -806,33 +821,20 @@ class FlyControl:
         try:
             self._is_flying = True
             self._reset_position_estimator()
-
-            self._control_thread = FlyControlThread(self._drone)
-            self._control_thread.start()
-
             if height is None:
-                height = self._take_off_height
+                height = self.setting.distance.take_off_height.get()
+
+            current_pos = self._drone.state.position
+            self.setting.hover_position = Position(
+                current_pos.x, current_pos.y, height)
 
             # TODO REMOVE
             # height = 1
             self.fly_status = FlyStatus.TAKING_OFF
 
-            self.move_distance(0, 0, height)
-            # Even move distance will calculate the time and wait for it
-            start_time = time.time()
-            while self._drone.state.position.z < height:
-                if time.time() - start_time > time_out:
-                    LOGGER.debug(
-                        f'{self._drone.name} only reach {self._drone.state.position.z}m')
-                    self._control_thread.set_height(
-                        self._drone.state.position.z)
+            self._control_thread = FlyControlThread(self._drone)
+            self._control_thread.start()
 
-                    break
-                time.sleep(0.1)
-
-            # TODO: Check if the current height is less than 0.1 meter
-            self.fly_status = FlyStatus.FLYING
-            self.fly_mode = FlyMode.HOVER
         except Exception as e:
             self._is_flying = False
             raise e
@@ -842,16 +844,14 @@ class FlyControl:
         """
         if self.is_flying:
             self.fly_status = FlyStatus.LANDING
-            self.move_distance(0, 0, -self._control_thread.get_height())
-
-            self._control_thread.stop()
+            
             self._control_thread.join()
             self._control_thread = None
 
-            # stop the motors
-            self._drone._scf.cf.commander.send_stop_setpoint()
-            self._is_flying = False
-            self.fly_status = FlyStatus.LANDED
+            
+    def _land_cb(self):
+        self._is_flying = False
+        self.fly_status = FlyStatus.LANDED
 
     def manually_fly(self, action: FlyCommandManually) -> None:
         """single action control
@@ -1122,6 +1122,7 @@ class FlyControlThread(Thread):
             try:
                 # For any additional information to be log along with the flight data
                 self._extra_log = ''
+                motion.reset()
                 # Update every 0.05 seconds
                 command = self._get_command()
 
@@ -1165,10 +1166,32 @@ class FlyControlThread(Thread):
                     else:
                         self._current_command = command
 
+                if self.fly_status == FlyStatus.TAKING_OFF:
+                    self._extra_log = 'Taking Off'
+                    current_position = self._drone_state.position
+                    if current_position.z < self.setting.distance.take_off_height.get():
+                        motion = self.get_hover_velocity(
+                            current_position, self.hover_position)
+                    else:
+                        self.fly_status = FlyStatus.FLYING
+                        self._fly_control.fly_mode = FlyMode.HOVER
+                        self._fly_control.take_off_cb.call()   
+                        
+                elif self.fly_statue == FlyStatus.LANDING:
+                    self._extra_log = 'Landing'
+                    current_position = self._drone_state.position
+                    if current_position.z > self.setting.distance.landing_cutoff_height.get():
+                        motion = self.get_hover_velocity(
+                            current_position, self.hover_position)
+                    else:
+                        self._send_stop_motor()
+                        self.fly_status = FlyStatus.LANDED
+                        self._fly_control.land_cb.call()
+                        break
+                        
+                                
                 # Process motion
                 if self.fly_status == FlyStatus.FLYING:
-
-                    motion.reset()
 
                     # Drone might crashed into the obstacle
                     # if int(self._drone_state.thrust) == 0:
@@ -1298,6 +1321,9 @@ class FlyControlThread(Thread):
 
         self._drone._scf.cf.commander.send_hover_setpoint(
             motion.vx, motion.vy, motion.yaw, self._get_z())
+        
+    def _send_stop_motor(self):
+        self._drone._scf.cf.commander.send_stop_setpoint()
 
     def _get_z(self):
         """Calculate the current z position of the drone
