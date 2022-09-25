@@ -658,12 +658,7 @@ class FlyControlVelocity:
         default_factory=lambda: VariableCallback(Motion(0.15, 0.15, 0.1, 0)))
 
     # type Motion
-    # hover correction speed
-    hover_min_correction_velocity: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Motion(0.02, 0.02, 0.01, 0)))
-
-    # type Motion
-    hover_max_correction_velocity: VariableCallback = field(
+    hover_correction_velocity: VariableCallback = field(
         default_factory=lambda: VariableCallback(Motion(0.05, 0.05, 0.05, 0)))
 
     # type Motion
@@ -1188,8 +1183,7 @@ class FlyControlThread(Thread):
                         self.fly_status = FlyStatus.LANDED
                         self._fly_control.land_cb.call()
                         break
-                        
-                                
+                                   
                 # Process motion
                 if self.fly_status == FlyStatus.FLYING:
 
@@ -1408,8 +1402,7 @@ class FlyControlThread(Thread):
 
         max_distance: Position = self.setting.distance.hover_correction_max_distance.get()
         min_distance: Position = self.setting.distance.hover_correction_min_distance.get()
-        max_velocity: Motion = self.setting.velocity.hover_max_correction_velocity.get()
-        min_velocity: Motion = self.setting.velocity.hover_min_correction_velocity.get()
+        velocity: Motion = self.setting.velocity.hover_correction_velocity.get()
 
         target_x = drone_position.x if target.x == None else target.x
         target_y = drone_position.y if target.y == None else target.y
@@ -1424,28 +1417,22 @@ class FlyControlThread(Thread):
         correct_velocity = Motion.zero()
 
         if dist_abs.x > max_distance.x:
-            correct_velocity.vx = max_velocity.vx
+            correct_velocity.vx = velocity.vx
         elif dist_abs.x > min_distance.x:
-            d = dist_abs.x - min_distance.x
-            correct_velocity.vx = min_velocity.vx + \
-                (max_velocity.vx - min_velocity.vx) * \
-                d / (max_distance.x - min_distance.x)
+            percentage = percentage_cal(dist_abs.x, min_distance.x, max_distance.x)
+            correct_velocity.vx = velocity.vx * percentage
 
         if dist_abs.y > max_distance.y:
-            correct_velocity.vy = max_velocity.vy
+            correct_velocity.vy = velocity.vy
         elif dist_abs.y > min_distance.y:
-            d = dist_abs.y - min_distance.y
-            correct_velocity.vy = min_velocity.vy + \
-                (max_velocity.vy - min_velocity.vy) * \
-                d / (max_distance.y - min_distance.y)
+            percentage = percentage_cal(dist_abs.y, min_distance.y, max_distance.y)
+            correct_velocity.vy = velocity.vy * percentage
 
         if dist_abs.z > max_distance.z:
-            correct_velocity.vz = max_velocity.vz
+            correct_velocity.vz = velocity.vz
         elif dist_abs.z > min_distance.z:
-            d = dist_abs.z - min_distance.z
-            correct_velocity.vz = min_velocity.vz + \
-                (max_velocity.vz - min_velocity.vz) * \
-                d / (max_distance.z - min_distance.z)
+            percentage = percentage_cal(dist_abs.z, min_distance.z, max_distance.z)
+            correct_velocity.vz = velocity.vz * percentage
 
         correct_velocity.vy = -correct_velocity.vy if distance.y > 0 else correct_velocity.vy
         correct_velocity.vz = -correct_velocity.vz if distance.z > 0 else correct_velocity.vz
@@ -1479,7 +1466,7 @@ class FlyControlThread(Thread):
         maintained_min_distance = self.setting.distance.hover_correction_min_distance.get().y
         maintained_max_distance = self.setting.distance.hover_correction_max_distance.get().y
 
-        velocity = self.setting.velocity.hover_max_correction_velocity.get().vy
+        velocity = self.setting.velocity.hover_correction_velocity.get().vy
 
         percentage = percentage_cal(
             distance, maintained_min_distance, maintained_max_distance)
