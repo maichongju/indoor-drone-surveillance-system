@@ -664,6 +664,14 @@ class FlyControlVelocity:
     # type Motion
     max_velocity: VariableCallback = field(
         default_factory=lambda: VariableCallback(Motion(0.5, 0.5, 0.1, 360/10)))
+    
+    # type float
+    take_off_velocity: VariableCallback = field(
+        default_factory=lambda: VariableCallback(0.15))
+    
+    # type float
+    land_velocity: VariableCallback = field(
+        default_factory=lambda: VariableCallback(0.1))
 
 
 @dataclass(frozen=True)
@@ -820,8 +828,8 @@ class FlyControl:
                 height = self.setting.distance.take_off_height.get()
 
             current_pos = self._drone.state.position
-            self.setting.hover_position = Position(
-                current_pos.x, current_pos.y, height)
+            self.setting.hover_position.set(Position(
+                current_pos.x, current_pos.y, height))
 
             # TODO REMOVE
             # height = 1
@@ -838,7 +846,14 @@ class FlyControl:
         """Land the drone
         """
         if self.is_flying:
+            cur_pos = self._drone.state.position
+            # Calculate the landing time it will take. Cut off the landing if it takes too long
+            landing_timeout = (cur_pos.z - self.setting.distance.landing_cutoff_height.get()) / self.setting.velocity.land_velocity.get()
+            self._control_thread._land_time_out = landing_timeout
+            self.setting.hover_position.set(Position(
+                cur_pos.x, cur_pos.y, 0))
             self.fly_status = FlyStatus.LANDING
+            
             
             self._control_thread.join()
             self._control_thread = None
@@ -1104,6 +1119,9 @@ class FlyControlThread(Thread):
         self.motion = Motion()
 
         self._dump_flight_data_file = None
+        
+        self._land_time_out = 0
+        self._land_timer = 0
 
         if SINGLETON.Config.get_value(ConfigKey.ROOT_DUMP_FLIGHT_DATA):
             self._dump_flight_data_file = get_dump_flight_data_file(
@@ -1166,23 +1184,29 @@ class FlyControlThread(Thread):
                     current_position = self._drone_state.position
                     if current_position.z < self.setting.distance.take_off_height.get():
                         motion = self.get_hover_velocity(
-                            current_position, self.hover_position)
+                            current_position, self.hover_position, override_z = self.setting.velocity.take_off_velocity.get())
                     else:
                         self.fly_status = FlyStatus.FLYING
                         self._fly_control.fly_mode = FlyMode.HOVER
                         self._fly_control.take_off_cb.call()   
                         
-                elif self.fly_statue == FlyStatus.LANDING:
+                elif self.fly_status == FlyStatus.LANDING:
                     self._extra_log = 'Landing'
                     current_position = self._drone_state.position
-                    if current_position.z > self.setting.distance.landing_cutoff_height.get():
-                        motion = self.get_hover_velocity(
-                            current_position, self.hover_position)
-                    else:
+                    
+                    cur_time = time.time()
+                    if current_position.z < self.setting.distance.landing_cutoff_height.get() and \
+                        cur_time - self._land_timer >= self._land_time_out:
                         self._send_stop_motor()
                         self.fly_status = FlyStatus.LANDED
                         self._fly_control.land_cb.call()
                         break
+                    
+                    else:
+                        motion = self.get_hover_velocity(
+                            current_position, self.hover_position, override_z=self.setting.velocity.land_velocity.get())
+
+
                                    
                 # Process motion
                 if self.fly_status == FlyStatus.FLYING:
@@ -1394,6 +1418,8 @@ class FlyControlThread(Thread):
                            drone_position: Position,
                            target: Position,
                            motion: Motion = None,
+                           velocity: Motion = None,
+                           override_z: float | None = None
                            ) -> Motion:
         """Calculate the require `Motion` to ensure the drone can hover on the target location
         """
@@ -1402,7 +1428,12 @@ class FlyControlThread(Thread):
 
         max_distance: Position = self.setting.distance.hover_correction_max_distance.get()
         min_distance: Position = self.setting.distance.hover_correction_min_distance.get()
-        velocity: Motion = self.setting.velocity.hover_correction_velocity.get()
+        
+        if velocity is None:
+            velocity: Motion = self.setting.velocity.hover_correction_velocity.get()
+            
+        if override_z is not None and isinstance(override_z, float):
+            velocity.vz = abs(override_z)
 
         target_x = drone_position.x if target.x == None else target.x
         target_y = drone_position.y if target.y == None else target.y
@@ -1939,6 +1970,10 @@ class FlyControlThread(Thread):
         state_data = self._drone_state.to_csv()
         data = f'{cur_time},{state_data},{motion.to_csv()},{self.setting.hover_position.get().to_csv()},{self.setting.fly_mode.get()},"{self._current_command}","{self._extra_log}"'
         print(data, file=self._dump_flight_data_file)
+        
+    def set_land_timeout(self, timeout: float):
+        self._land_time_out = timeout
+        self._land_timer = time.time()
 
     @property
     def setting(self) -> FlyControlSetting:
@@ -1959,6 +1994,10 @@ class FlyControlThread(Thread):
     @property
     def fly_status(self) -> FlyStatus:
         return self._fly_control.fly_status
+    
+    @fly_status.setter
+    def fly_status(self, value: FlyStatus):
+        self._fly_control.fly_status = value
 
     @property
     def hover_set(self) -> bool:
