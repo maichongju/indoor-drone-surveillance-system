@@ -122,6 +122,11 @@ class Position:
 class AxisDirection:
     axis: Axis | None = None
     direction: Direction | None = None
+    
+    def is_complete(self) -> bool:
+        """Determines if the axis and direction are set
+        """
+        return self.axis is not None and self.direction is not None
 
     @staticmethod
     def x_positive() -> AxisDirection:
@@ -332,3 +337,20 @@ def point_relevant_location(p1: Position, p2: Position, yaw: float=0) -> Tuple[G
         y_axis = GDirection.EAST
         
     return (x_axis, y_axis)
+
+def get_yaw_from_axis_direction(axis_direction: AxisDirection) -> float:
+    """Get the yaw from the axis direction
+    """
+    if not axis_direction.is_complete():
+        raise ValueError('axis_direction is not complete')
+    if axis_direction.axis == Axis.X:
+        if axis_direction.direction == Direction.POSITIVE:
+            return 0
+        else:
+            return 180
+    elif axis_direction.axis == Axis.Y:
+        if axis_direction.direction == Direction.NEGATIVE:
+            return 90
+        else:
+            return -90
+

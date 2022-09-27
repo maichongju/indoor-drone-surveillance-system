@@ -19,7 +19,8 @@ from general.enum import Enum, IntEnum, auto
 from general.list import List
 from general.utils import (Axis, AxisDirection, Direction, Position, GDirection,
                            has_dongle, percentage_cal, rotate_axis_coord,
-                           point_relevant_location_yaw, point_relevant_location)
+                           point_relevant_location_yaw, point_relevant_location,
+                           get_yaw_from_axis_direction)
 from general.debug import get_dump_flight_data_file
 from general.cflib import CFParameter
 from log import DroneInfo, LogVariable
@@ -1701,7 +1702,8 @@ class FlyControlThread(Thread):
         # Need to rotate to the target direction. always rotate to Y axis first
 
         if self._go_to_helper.action == GoToAction.REQUIRE_INIT or \
-                self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE:
+                self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE\
+                    or self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE:
 
             if self._go_to_helper.action == GoToAction.REQUIRE_INIT:
                 self._go_to_helper.reset()
@@ -1710,6 +1712,8 @@ class FlyControlThread(Thread):
                     self._go_to_helper.moving_direction.axis = Axis.Y
                 else:
                     self._go_to_helper.moving_direction.axis = Axis.X
+            elif self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE:
+                pass
             else:  # Require Axis Change
                 self._go_to_helper.moving_direction.axis = Axis.Y if self._go_to_helper.moving_direction.axis == Axis.X else Axis.X
 
@@ -1842,7 +1846,8 @@ class FlyControlThread(Thread):
                  dist: Position,
                  current_yaw: float,
                  margin: float,
-                 max_yaw: float = None
+                 max_yaw: float = None,
+                 direction: Direction = None
                  ) -> float:
         """Get the needed yaw to the face the direction for the axis. if the require yaw is 
         larger to the max yaw, then the max yaw will be used instead.
@@ -1869,61 +1874,128 @@ class FlyControlThread(Thread):
         """
         # !TODO: When the drone is at opposite side of the target. There might be an issue
         yaw = 0
-        match axis:
-            case Axis.X:
-                # Behind the target. Turn and face positive x
+        
+        target_yaw = 0
+        
+        
+        if direction is None:
+            if axis == Axis.X:
                 if dist.x < 0:
-                    target_yaw = 0
-                    move_yaw = current_yaw - target_yaw
-                    # Only turn if the yaw is not within the margin
-                    if abs(move_yaw) > margin:
-                        # On the left of the target. Turn right
-                        if move_yaw > 0:
-                            yaw = min(max_yaw, move_yaw)
-                            # max_yaw if move_yaw > max_yaw else move_yaw
-                        else:
-                            # On the right of the target. Turn left
-                            yaw = max(-max_yaw, move_yaw)
+                    direction = Direction.POSITIVE
                 else:
-                    # Ahead of the target. Turn and face negative x
-                    target_yaw = 180
-                    move_yaw = abs(abs(current_yaw) - target_yaw)
-                    if move_yaw > margin:
-                        if current_yaw > 0:
-                            # turn left
-                            yaw = -min(max_yaw, move_yaw)
-                        else:
-                            # turn right
-                            yaw = min(max_yaw, move_yaw)
-
-            case Axis.Y:
-                # Right hand side of the target, need to face negative y
+                    direction = Direction.NEGATIVE
+                    
+            else:
                 if dist.y < 0:
-                    target_yaw = 90
-                    move_yaw = abs(current_yaw) - target_yaw
-                    if current_yaw < 0 and current_yaw > -90:
-                        move_yaw += 2 * current_yaw
-                    elif current_yaw < -90:
-                        move_yaw += 2 * (180 - abs(current_yaw))
-
-                    if abs(move_yaw) > margin:
-                        if abs(current_yaw) < 90:
-                            yaw = max(-max_yaw, move_yaw)
-                        else:
-                            yaw = min(max_yaw, move_yaw)
+                    direction = Direction.NEGATIVE
                 else:
-                    target_yaw = -90
-                    move_yaw = abs(abs(current_yaw) - abs(target_yaw))
-                    if current_yaw > 0 and current_yaw < 90:
-                        move_yaw += 2 * current_yaw
-                    elif current_yaw > 90:
-                        move_yaw += 2 * (180 - abs(current_yaw))
+                    direction = Direction.POSITIVE
+        
+        
+        target = AxisDirection(axis, direction)
+        target_yaw = get_yaw_from_axis_direction(target)
+        
+        if target_yaw == 0:
+            move_yaw = current_yaw - target_yaw
+            # Only turn if the yaw is not within the margin
+            if abs(move_yaw) > margin:
+                # On the left of the target. Turn right
+                if move_yaw > 0:
+                    yaw = min(max_yaw, move_yaw)
+                    # max_yaw if move_yaw > max_yaw else move_yaw
+                else:
+                    # On the right of the target. Turn left
+                    yaw = max(-max_yaw, move_yaw)
+        elif target_yaw == 180:
+            move_yaw = abs(abs(current_yaw) - target_yaw)
+            if move_yaw > margin:
+                if current_yaw > 0:
+                    # turn left
+                    yaw = -min(max_yaw, move_yaw)
+                else:
+                    # turn right
+                    yaw = min(max_yaw, move_yaw)        
+        elif target_yaw == 90:
+            move_yaw = abs(current_yaw) - target_yaw
+            if current_yaw < 0 and current_yaw > -90:
+                move_yaw += 2 * current_yaw
+            elif current_yaw < -90:
+                move_yaw += 2 * (180 - abs(current_yaw))
 
-                    if abs(move_yaw) > margin:
-                        if abs(current_yaw) < 90:
-                            yaw = min(max_yaw, move_yaw)
-                        else:
-                            yaw = max(-max_yaw, -move_yaw)
+            if abs(move_yaw) > margin:
+                if abs(current_yaw) < 90:
+                    yaw = max(-max_yaw, move_yaw)
+                else:
+                    yaw = min(max_yaw, move_yaw)
+
+        elif target_yaw == -90:
+            move_yaw = abs(abs(current_yaw) - abs(target_yaw))
+            if current_yaw > 0 and current_yaw < 90:
+                move_yaw += 2 * current_yaw
+            elif current_yaw > 90:
+                move_yaw += 2 * (180 - abs(current_yaw))
+
+            if abs(move_yaw) > margin:
+                if abs(current_yaw) < 90:
+                    yaw = min(max_yaw, move_yaw)
+                else:
+                    yaw = max(-max_yaw, -move_yaw)
+        
+        # match axis:
+        #     case Axis.X:
+        #         # Behind the target. Turn and face positive x
+        #         if dist.x < 0:
+        #             target_yaw = 0
+        #             move_yaw = current_yaw - target_yaw
+        #             # Only turn if the yaw is not within the margin
+        #             if abs(move_yaw) > margin:
+        #                 # On the left of the target. Turn right
+        #                 if move_yaw > 0:
+        #                     yaw = min(max_yaw, move_yaw)
+        #                     # max_yaw if move_yaw > max_yaw else move_yaw
+        #                 else:
+        #                     # On the right of the target. Turn left
+        #                     yaw = max(-max_yaw, move_yaw)
+        #         else:
+        #             # Ahead of the target. Turn and face negative x
+        #             target_yaw = 180
+        #             move_yaw = abs(abs(current_yaw) - target_yaw)
+        #             if move_yaw > margin:
+        #                 if current_yaw > 0:
+        #                     # turn left
+        #                     yaw = -min(max_yaw, move_yaw)
+        #                 else:
+        #                     # turn right
+        #                     yaw = min(max_yaw, move_yaw)
+
+        #     case Axis.Y:
+        #         # Right hand side of the target, need to face negative y
+        #         if dist.y < 0:
+        #             target_yaw = 90
+        #             move_yaw = abs(current_yaw) - target_yaw
+        #             if current_yaw < 0 and current_yaw > -90:
+        #                 move_yaw += 2 * current_yaw
+        #             elif current_yaw < -90:
+        #                 move_yaw += 2 * (180 - abs(current_yaw))
+
+        #             if abs(move_yaw) > margin:
+        #                 if abs(current_yaw) < 90:
+        #                     yaw = max(-max_yaw, move_yaw)
+        #                 else:
+        #                     yaw = min(max_yaw, move_yaw)
+        #         else:
+        #             target_yaw = -90
+        #             move_yaw = abs(abs(current_yaw) - abs(target_yaw))
+        #             if current_yaw > 0 and current_yaw < 90:
+        #                 move_yaw += 2 * current_yaw
+        #             elif current_yaw > 90:
+        #                 move_yaw += 2 * (180 - abs(current_yaw))
+
+        #             if abs(move_yaw) > margin:
+        #                 if abs(current_yaw) < 90:
+        #                     yaw = min(max_yaw, move_yaw)
+        #                 else:
+        #                     yaw = max(-max_yaw, -move_yaw)
 
         return yaw
 
