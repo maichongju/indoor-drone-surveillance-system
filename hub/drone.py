@@ -1941,6 +1941,7 @@ class FlyControlThread(Thread):
                 else:
                     yaw = max(-max_yaw, -move_yaw)
 
+
         return yaw
 
     def _get_yaw_new(self, maintain_yaw: float, current_yaw: float, margin: float, max_yaw: float):
