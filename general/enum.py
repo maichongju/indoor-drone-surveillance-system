@@ -1,5 +1,6 @@
 from enum import Enum as pEnum
 from enum import IntEnum as pIntEnum
+from enum import auto
 
 
 class Enum(pEnum):
