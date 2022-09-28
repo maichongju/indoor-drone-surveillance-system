@@ -170,7 +170,38 @@ class AxisDirection:
             return AxisDirection(Axis.Y, Direction.POSITIVE)
         else:
             return AxisDirection(Axis.X, Direction.NEGATIVE)
-
+        
+    def rotate_right(self) -> AxisDirection:
+        if not self.is_complete():
+            raise ValueError('Axis and direction must be set')
+        
+        if self.axis == Axis.X:
+            if self.direction == Direction.POSITIVE: # x+
+                return AxisDirection(Axis.Y, Direction.NEGATIVE)
+            else: # x-
+                return AxisDirection(Axis.Y, Direction.POSITIVE)
+        else:
+            if self.direction == Direction.POSITIVE:    # y+
+                return AxisDirection(Axis.X, Direction.POSITIVE)
+            else: # y-
+                return AxisDirection(Axis.X, Direction.NEGATIVE)
+    
+    def rotate_left(self) -> AxisDirection:
+        if not self.is_complete():
+            raise ValueError('Axis and direction must be set')
+        
+        if self.axis == Axis.X:
+            if self.direction == Direction.POSITIVE: # x+
+                return AxisDirection(Axis.Y, Direction.POSITIVE)
+            else: # x-
+                return AxisDirection(Axis.Y, Direction.NEGATIVE)
+        else:
+            if self.direction == Direction.POSITIVE: # y+
+                return AxisDirection(Axis.X, Direction.NEGATIVE)
+            else: # y-
+                return AxisDirection(Axis.X, Direction.POSITIVE)
+            
+            
     def reset(self):
         self.axis = None
         self.direction = None
@@ -354,3 +385,16 @@ def get_yaw_from_axis_direction(axis_direction: AxisDirection) -> float:
         else:
             return -90
 
+def round_up(n: int | float, round_num: int| float ) -> float|int:
+    """Round up to the nearest round_num
+    Parameters:
+        n (int|float): number to round up
+        round_num (int|float): round to the nearest round_num
+    
+    Example:
+    >>> round_up(12, 10)
+    20
+    >>> round_up(6, 5)
+    10
+    """
+    return math.ceil(n / round_num) * round_num
