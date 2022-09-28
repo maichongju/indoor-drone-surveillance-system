@@ -1117,7 +1117,7 @@ class FlyControlThread(Thread):
             try:
                 # For any additional information to be log along with the flight data
                 self._extra_log = ''
-                motion.reset()
+                motion = Motion()
                 # Update every 0.05 seconds
                 command = self._get_command()
 
