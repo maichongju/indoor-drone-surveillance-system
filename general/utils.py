@@ -4,6 +4,7 @@ import json
 import math
 from dataclasses import dataclass
 from typing import Tuple
+from pathlib import Path
 
 from sympy import Point2D, Point3D
 
@@ -332,3 +333,6 @@ def point_relevant_location(p1: Position, p2: Position, yaw: float=0) -> Tuple[G
         y_axis = GDirection.EAST
         
     return (x_axis, y_axis)
+
+def ensure_folder_exist(path: str):
+    Path(path).mkdir(parents=True, exist_ok=True)
