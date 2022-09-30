@@ -123,6 +123,11 @@ class Position:
 class AxisDirection:
     axis: Axis | None = None
     direction: Direction | None = None
+    
+    def is_complete(self) -> bool:
+        """Determines if the axis and direction are set
+        """
+        return self.axis is not None and self.direction is not None
 
     @staticmethod
     def x_positive() -> AxisDirection:
@@ -166,7 +171,38 @@ class AxisDirection:
             return AxisDirection(Axis.Y, Direction.POSITIVE)
         else:
             return AxisDirection(Axis.X, Direction.NEGATIVE)
-
+        
+    def rotate_right(self) -> AxisDirection:
+        if not self.is_complete():
+            raise ValueError('Axis and direction must be set')
+        
+        if self.axis == Axis.X:
+            if self.direction == Direction.POSITIVE: # x+
+                return AxisDirection(Axis.Y, Direction.NEGATIVE)
+            else: # x-
+                return AxisDirection(Axis.Y, Direction.POSITIVE)
+        else:
+            if self.direction == Direction.POSITIVE:    # y+
+                return AxisDirection(Axis.X, Direction.POSITIVE)
+            else: # y-
+                return AxisDirection(Axis.X, Direction.NEGATIVE)
+    
+    def rotate_left(self) -> AxisDirection:
+        if not self.is_complete():
+            raise ValueError('Axis and direction must be set')
+        
+        if self.axis == Axis.X:
+            if self.direction == Direction.POSITIVE: # x+
+                return AxisDirection(Axis.Y, Direction.POSITIVE)
+            else: # x-
+                return AxisDirection(Axis.Y, Direction.NEGATIVE)
+        else:
+            if self.direction == Direction.POSITIVE: # y+
+                return AxisDirection(Axis.X, Direction.NEGATIVE)
+            else: # y-
+                return AxisDirection(Axis.X, Direction.POSITIVE)
+            
+            
     def reset(self):
         self.axis = None
         self.direction = None
@@ -337,3 +373,33 @@ def point_relevant_location(p1: Position, p2: Position, yaw: float = 0) -> Tuple
 
 def ensure_folder_exist(path: str):
     Path(path).mkdir(parents=True, exist_ok=True)
+
+def get_yaw_from_axis_direction(axis_direction: AxisDirection) -> float:
+    """Get the yaw from the axis direction
+    """
+    if not axis_direction.is_complete():
+        raise ValueError('axis_direction is not complete')
+    if axis_direction.axis == Axis.X:
+        if axis_direction.direction == Direction.POSITIVE:
+            return 0
+        else:
+            return 180
+    elif axis_direction.axis == Axis.Y:
+        if axis_direction.direction == Direction.NEGATIVE:
+            return 90
+        else:
+            return -90
+
+def round_up(n: int | float, round_num: int| float ) -> float|int:
+    """Round up to the nearest round_num
+    Parameters:
+        n (int|float): number to round up
+        round_num (int|float): round to the nearest round_num
+    
+    Example:
+    >>> round_up(12, 10)
+    20
+    >>> round_up(6, 5)
+    10
+    """
+
