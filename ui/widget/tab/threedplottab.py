@@ -1,18 +1,14 @@
 from __future__ import annotations
 from typing import List
-from log.logger import LOGGER
 
 # Must import this before importing matplotlib
-from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QFileDialog
+from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton
+
+# from hub import Hub
+
+from ui.widget.canvas import Canvas3D
 
 import pandas as pd
-# from hub import Hub
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-
-# from general.utils import ensure_folder_exist
-import time 
-
 from ui.widget.tab.tab import Tab
 
 EXPORT_FOLDER = 'export'
@@ -32,7 +28,7 @@ class ThreeDPlotTab(Tab):
         canvas_layout = QVBoxLayout()
         main_layout.addLayout(canvas_layout)
         
-        self.canvas = Canvas()
+        self.canvas = Canvas3D()
         canvas_layout.addWidget(self.canvas)
         
         toolbar_layout = QVBoxLayout()
@@ -60,49 +56,13 @@ class ThreeDPlotTab(Tab):
         self.canvas.clear()
         self.file_name = None
         
-    def plot(self, positions: List, file_name:str):
-        self.canvas.plot(positions)
+    def plot(self, df: pd.DataFrame, file_name:str):
+        
+        cols = ['stateEstimate.x','stateEstimate.y','stateEstimate.z']
+        values = []
+        for col in cols:
+            values.append(df[col].values.tolist())        
+        self.canvas.plot(values)
         self.file_name = file_name
         
         
-class Canvas(FigureCanvas):
-    def __init__(self,):
-        self.fig = Figure(figsize=(6, 6))
-        super().__init__(self.fig)
-        self.ax = self.fig.add_subplot(111, projection='3d')
-        self.ax.set_xlabel('Y')
-        self.ax.set_ylabel('X')
-        self.ax.set_zlabel('Z')
-        
-    def plot(self, points):
-        self.ax.clear()
-        size = len(points[0])
-        for i in range(size):
-            self.ax.scatter(points[0][i], -points[1][i], points[2][i])
-
-        
-        self.draw()
-            
-    def to_top_down(self):
-        self.ax.view_init(-90, -90)
-        self.draw()
-        
-    def to_side_view_Y(self):
-        self.ax.view_init(0, -90)
-        self.draw()
-        
-    def to_side_view_X(self):
-        self.ax.view_init(0, 0)
-        self.draw()
-        
-    def clear(self):
-        self.ax.clear()
-        self.draw()
-        
-    def save(self, source_file_name ):
-        if source_file_name is None:
-            return
-        # ensure_folder_exist(EXPORT_FOLDER)
-        cur_time = time.strftime('%Y%m%d%H%M%S')
-        self.fig.savefig(f'{EXPORT_FOLDER}/{source_file_name}_3d_{cur_time}.png')
-        LOGGER.debug(f'3D plot saved to {EXPORT_FOLDER}/{source_file_name}_3d_{cur_time}.png')

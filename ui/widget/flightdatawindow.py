@@ -3,6 +3,7 @@ from matplotlib.pyplot import set_loglevel
 set_loglevel('warning')
 
 from ui.widget.tab.threedplottab import ThreeDPlotTab
+from ui.widget.tab.twodplottab import TwoDPlotTab
 
 # Must import this before importing matplotlib
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QFileDialog, QTabWidget
@@ -51,11 +52,7 @@ class FlightDataWindow(QWidget):
             return 
         # file_path = 'logs/flightdataexample.csv'
         df = pd.read_csv(file_path)
-        cols = ['stateEstimate.x','stateEstimate.y','stateEstimate.z']
-        values = []
-        for col in cols:
-            values.append(df[col].values.tolist())
-        self.tab_3d.plot(values, file_name)
+        self.tab_3d.plot(df, file_name)
         
     def _clear_btn_on_click(self):
         self.tab_3d.clear()
