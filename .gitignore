@@ -201,6 +201,8 @@ ml/dataset
 
 cflib
 cache
+export
+*.csv
 
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python
