@@ -402,4 +402,5 @@ def round_up(n: int | float, round_num: int| float ) -> float|int:
     >>> round_up(6, 5)
     10
     """
+    return round_num * math.ceil(n / round_num)
 
