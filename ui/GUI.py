@@ -188,7 +188,7 @@ class MainWindow(QMainWindow):
         value = dialog.exec()
         
     def _show_flight_data_plot(self):
-        self._window = FlightDataWindow(self._hub)
+        self._window = FlightDataWindow()
         self._window.show()
         
 
