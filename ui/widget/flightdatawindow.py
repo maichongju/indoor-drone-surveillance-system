@@ -43,6 +43,9 @@ class FlightDataWindow(QWidget):
         self.tab_3d = ThreeDPlotTab(self)
         tab.addTab(self.tab_3d, self.tab_3d.name)
         
+        self.tab_2d = TwoDPlotTab(self)
+        tab.addTab(self.tab_2d, self.tab_2d.name)
+        
         
     def _load_btn_on_click(self):
         # Add file dialog (use QFileDialog)
@@ -53,9 +56,11 @@ class FlightDataWindow(QWidget):
         # file_path = 'logs/flightdataexample.csv'
         df = pd.read_csv(file_path)
         self.tab_3d.plot(df, file_name)
+        self.tab_2d.plot(df, file_name)
         
     def _clear_btn_on_click(self):
         self.tab_3d.clear()
+        self.tab_2d.clear()
         
         
         
