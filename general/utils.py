@@ -10,7 +10,7 @@ from sympy import Point2D, Point3D
 
 from cflib.drivers.crazyradio import Crazyradio
 
-from general.enum import IntEnum
+from general.enum import IntEnum, Enum, auto
 
 
 @dataclass(frozen=True)
@@ -172,10 +172,10 @@ class AxisDirection:
         self.direction = None
 
 
-class Axis(IntEnum):
-    X = 0,
-    Y = 1,
-    Z = 2
+class Axis(Enum):
+    X = auto(),
+    Y = auto(),
+    Z = auto()
 
 
 class Direction(IntEnum):
@@ -310,29 +310,30 @@ def point_relevant_location_yaw(p1: Position, p2: Position, yaw: float) -> GDire
         return GDirection.SAME
 
 
-def point_relevant_location(p1: Position, p2: Position, yaw: float=0) -> Tuple[GDirection, GDirection]:
+def point_relevant_location(p1: Position, p2: Position, yaw: float = 0) -> Tuple[GDirection, GDirection]:
     """Return the relevant location of p2 to p1. Return are [x-axis,y-axis]
     """
-    
+
     if yaw != 0:
         temp_p1 = rotate_axis_coord(p1.x, p1.y, -yaw)
         temp_p2 = rotate_axis_coord(p2.x, p2.y, -yaw)
         p1 = Position(temp_p1[0], temp_p1[1], p1.z)
         p2 = Position(temp_p2[0], temp_p2[1], p2.z)
- 
+
     x_axis = GDirection.SAME
     if p2.x > p1.x:
         x_axis = GDirection.NORTH
     elif p2.x < p1.x:
         x_axis = GDirection.SOUTH
-        
+
     y_axis = GDirection.SAME
     if p2.y > p1.y:
         y_axis = GDirection.WEST
     elif p2.y < p1.y:
         y_axis = GDirection.EAST
-        
+
     return (x_axis, y_axis)
+
 
 def ensure_folder_exist(path: str):
     Path(path).mkdir(parents=True, exist_ok=True)
