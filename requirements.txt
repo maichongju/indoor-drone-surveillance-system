@@ -8,6 +8,7 @@ jsonpickle
 pytest
 pytest-qt
 sympy
+matplotlib
 
 
 # pytorch with cuda

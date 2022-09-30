@@ -1,6 +1,7 @@
 # https://www.pythonguis.com/pyqt6-tutorial/
 
 
+from json import tool
 import logging
 from logging import Handler
 
@@ -20,6 +21,7 @@ from ui.widget.dialog import LocationDialog
 from ui.widget.tab.dronetab import DroneWidget
 from ui.widget.tab.monitortab import MonitorTab
 from ui.widget.tunepid import TunePID
+from ui.widget.flightdatawindow import FlightDataWindow
 
 class GUI(QApplication):
     def __init__(self, hub: Hub, config:Config, start_check = True):
@@ -137,6 +139,12 @@ class MainWindow(QMainWindow):
         location_setting_action.triggered.connect(self._show_location_dialog)
         location_menu.addAction(location_setting_action)
         
+        tool_menu = menu_bar.addMenu('&Tool')
+        
+        flight_data_plot_action = QAction('&Flight Data Plot'   , tool_menu)
+        flight_data_plot_action.triggered.connect(self._show_flight_data_plot)
+        tool_menu.addAction(flight_data_plot_action)
+        
         debug_menu = menu_bar.addMenu('&Debug')
         # drone_menu = debug_menu.addMenu('&Drone')
         # for drone in self._hub.drones.values():
@@ -178,6 +186,11 @@ class MainWindow(QMainWindow):
     def _show_location_dialog(self):
         dialog = LocationDialog(self)
         value = dialog.exec()
+        
+    def _show_flight_data_plot(self):
+        self._window = FlightDataWindow()
+        self._window.show()
+        
 
     def _tab_changed(self):
         for i in range(self.tab.count()):
