@@ -665,11 +665,11 @@ class FlyControlVelocity:
     # type Motion
     max_velocity: VariableCallback = field(
         default_factory=lambda: VariableCallback(Motion(0.5, 0.5, 0.1, 360/10)))
-    
+
     # type float
     take_off_velocity: VariableCallback = field(
         default_factory=lambda: VariableCallback(0.15))
-    
+
     # type float
     land_velocity: VariableCallback = field(
         default_factory=lambda: VariableCallback(0.1))
@@ -715,7 +715,7 @@ class FlyControlDistance:
     # type float
     take_off_height: VariableCallback = field(
         default_factory=lambda: VariableCallback(0.4))
-    
+
     landing_cutoff_height: VariableCallback = field(
         default_factory=lambda: VariableCallback(0.1))
 
@@ -732,6 +732,7 @@ class FlyControlSetting:
     - hover_position (Position): Position(0, 0, 0)
     - velocity (FlyControlVelocity)
     - distance (FlyControlDistance)
+    - avoid_trigger [bool]
     """
     # type FlyMode
     fly_mode: VariableCallback = field(
@@ -759,6 +760,20 @@ class FlyControlSetting:
 
     # type FlyControlDistance
     distance: FlyControlDistance = field(default_factory=FlyControlDistance)
+
+    avoid_trigger: VariableCallback = field(
+        default_factory=lambda: VariableCallback([False, False, False, False]))
+
+    @property
+    def fly_motion(self) -> Motion:
+        return self._fly_motion
+
+    @fly_motion.setter
+    def fly_motion(self, value: Motion):
+        self._fly_motion = value
+
+    def __post_init__(self):
+        self._fly_motion = Motion(0, 0, 0, 0)
 
     # DEBUG purpose section
     # type Motion
@@ -807,7 +822,7 @@ class FlyControl:
 
         self.take_off_cb = Caller()
         self.land_cb = Caller()
-        
+
         self.land_cb.add_callback(self._land_cb)
 
     def take_off(self, height: float = None, time_out: float = 5):
@@ -849,17 +864,16 @@ class FlyControl:
         if self.is_flying:
             cur_pos = self._drone.state.position
             # Calculate the landing time it will take. Cut off the landing if it takes too long
-            landing_timeout = (cur_pos.z - self.setting.distance.landing_cutoff_height.get()) / self.setting.velocity.land_velocity.get()
+            landing_timeout = (cur_pos.z - self.setting.distance.landing_cutoff_height.get()
+                               ) / self.setting.velocity.land_velocity.get()
             self._control_thread._land_time_out = landing_timeout
             self.setting.hover_position.set(Position(
                 cur_pos.x, cur_pos.y, 0))
             self.fly_status = FlyStatus.LANDING
-            
-            
+
             self._control_thread.join()
             self._control_thread = None
 
-            
     def _land_cb(self):
         self._is_flying = False
         self.fly_status = FlyStatus.LANDED
@@ -1035,7 +1049,7 @@ class FlyControl:
 class GoToAction(Enum):
     REQUIRE_INIT = auto()
     REQUIRE_AXIS_CHANGE = auto()
-    REQUIRE_AXIS_CHANGE_OBSTACLE = auto() # Obstacle detected
+    REQUIRE_AXIS_CHANGE_OBSTACLE = auto()  # Obstacle detected
     AXIS_CHANGING = auto()
     MOVING = auto()
     HOLD = auto()
@@ -1121,7 +1135,7 @@ class FlyControlThread(Thread):
         self.motion = Motion()
 
         self._dump_flight_data_file = None
-        
+
         self._land_time_out = 0
         self._land_timer = 0
 
@@ -1186,30 +1200,28 @@ class FlyControlThread(Thread):
                     current_position = self._drone_state.position
                     if current_position.z < self.setting.distance.take_off_height.get():
                         motion = self.get_hover_velocity(
-                            current_position, self.hover_position, override_z = self.setting.velocity.take_off_velocity.get())
+                            current_position, self.hover_position, override_z=self.setting.velocity.take_off_velocity.get())
                     else:
                         self.fly_status = FlyStatus.FLYING
                         self._fly_control.fly_mode = FlyMode.HOVER
-                        self._fly_control.take_off_cb.call()   
-                        
+                        self._fly_control.take_off_cb.call()
+
                 elif self.fly_status == FlyStatus.LANDING:
                     self._extra_log = 'Landing'
                     current_position = self._drone_state.position
-                    
+
                     cur_time = time.time()
                     if current_position.z < self.setting.distance.landing_cutoff_height.get() and \
-                        cur_time - self._land_timer >= self._land_time_out:
+                            cur_time - self._land_timer >= self._land_time_out:
                         self._send_stop_motor()
                         self.fly_status = FlyStatus.LANDED
                         self._fly_control.land_cb.call()
                         break
-                    
+
                     else:
                         motion = self.get_hover_velocity(
                             current_position, self.hover_position, override_z=self.setting.velocity.land_velocity.get())
 
-
-                                   
                 # Process motion
                 if self.fly_status == FlyStatus.FLYING:
 
@@ -1341,7 +1353,7 @@ class FlyControlThread(Thread):
 
         self._drone._scf.cf.commander.send_hover_setpoint(
             motion.vx, motion.vy, motion.yaw, self._get_z())
-        
+
     def _send_stop_motor(self):
         self._drone._scf.cf.commander.send_stop_setpoint()
 
@@ -1430,10 +1442,10 @@ class FlyControlThread(Thread):
 
         max_distance: Position = self.setting.distance.hover_correction_max_distance.get()
         min_distance: Position = self.setting.distance.hover_correction_min_distance.get()
-        
+
         if velocity is None:
             velocity: Motion = self.setting.velocity.hover_correction_velocity.get()
-            
+
         if override_z is not None and isinstance(override_z, float):
             velocity.vz = abs(override_z)
 
@@ -1452,19 +1464,22 @@ class FlyControlThread(Thread):
         if dist_abs.x > max_distance.x:
             correct_velocity.vx = velocity.vx
         elif dist_abs.x > min_distance.x:
-            percentage = percentage_cal(dist_abs.x, min_distance.x, max_distance.x)
+            percentage = percentage_cal(
+                dist_abs.x, min_distance.x, max_distance.x)
             correct_velocity.vx = velocity.vx * percentage
 
         if dist_abs.y > max_distance.y:
             correct_velocity.vy = velocity.vy
         elif dist_abs.y > min_distance.y:
-            percentage = percentage_cal(dist_abs.y, min_distance.y, max_distance.y)
+            percentage = percentage_cal(
+                dist_abs.y, min_distance.y, max_distance.y)
             correct_velocity.vy = velocity.vy * percentage
 
         if dist_abs.z > max_distance.z:
             correct_velocity.vz = velocity.vz
         elif dist_abs.z > min_distance.z:
-            percentage = percentage_cal(dist_abs.z, min_distance.z, max_distance.z)
+            percentage = percentage_cal(
+                dist_abs.z, min_distance.z, max_distance.z)
             correct_velocity.vz = velocity.vz * percentage
 
         correct_velocity.vy = -correct_velocity.vy if distance.y > 0 else correct_velocity.vy
@@ -1540,7 +1555,7 @@ class FlyControlThread(Thread):
 
         return Line(p1, p2)
 
-    def _auto_avoidance_cal(self, dist: float, trigger_dist: float, min_dist: float,velocity:float):
+    def _auto_avoidance_cal(self, dist: float, trigger_dist: float, min_dist: float, velocity: float):
         """Core calculate of the auto avoidance. 
         (abs(distance - trigger) / (trigger - min) )^2
         The closer of the drone the faster the drone will avoid.
@@ -1596,18 +1611,22 @@ class FlyControlThread(Thread):
             velocity[3] = self._auto_avoidance_cal(
                 dist_right, trigger_distance.y, min_distance.y, avoid_velocity.vy)
 
-        # Ensure it will not go beyond the max velocity
-        if velocity[0] != 0:
+        if velocity[0] != 0 and velocity[1] != 0:
+            motion.vx = 0  # Too close both side of the drone. Stop all the movement on x axis
+        elif velocity[0] != 0:
             motion.vx = -velocity[0]
-
-        if velocity[1] != 0:
+        elif velocity[1] != 0:
             motion.vx = velocity[1]
 
-        if velocity[2] != 0:
-            motion.vy = -velocity[2] 
-                
-        if velocity[3] != 0:
-            motion.vy = velocity[3] 
+        if velocity[2] != 0 and velocity[3] != 0:
+            motion.vy = 0
+        elif velocity[2] != 0:
+            motion.vy = -velocity[2]
+        elif velocity[3] != 0:
+            motion.vy = velocity[3]
+            
+        for count, v in enumerate(velocity):
+            self.setting.avoid_trigger.get()[count] = v != 0 # update the trigger status
 
         # avoidance trigger
         if velocity.count(0) != 4:
@@ -1701,7 +1720,7 @@ class FlyControlThread(Thread):
 
         if self._go_to_helper.action == GoToAction.REQUIRE_INIT or \
                 self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE\
-                    or self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE:
+        or self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE:
 
             if self._go_to_helper.action == GoToAction.REQUIRE_INIT:
                 self._go_to_helper.reset()
@@ -1777,7 +1796,7 @@ class FlyControlThread(Thread):
                         self._go_to_helper.moving_direction, self._drone_state.position, self._go_to_helper.target_position):
                     # starting approaching the target. Use the hold mode
                     self._change_to_hold(self._drone_state.position,
-                                            GoToAction.REQUIRE_AXIS_CHANGE)
+                                         GoToAction.REQUIRE_AXIS_CHANGE)
 
                 else:
                     thrust_percent = thrust_percent ** 2
@@ -1794,7 +1813,8 @@ class FlyControlThread(Thread):
                 if thrust_percent == 0 or self._is_pass_target(
                         self._go_to_helper.moving_direction, self._drone_state.position, self._go_to_helper.target_position):
                     # starting approaching the target. Use the hold mode
-                    self._change_to_hold(self._drone_state.position, GoToAction.REQUIRE_AXIS_CHANGE)
+                    self._change_to_hold(
+                        self._drone_state.position, GoToAction.REQUIRE_AXIS_CHANGE)
 
                 else:
                     thrust_percent = thrust_percent ** 2
@@ -1802,8 +1822,8 @@ class FlyControlThread(Thread):
                     motion.vx = vx
 
         return motion
-    
-    def _change_to_hold(self,hold_position: Position, next_action: GoToAction):
+
+    def _change_to_hold(self, hold_position: Position, next_action: GoToAction):
         self._go_to_helper.action = GoToAction.HOLD
         self._go_to_helper.hold_position = hold_position
         self._go_to_helper.next_action = next_action
@@ -1872,27 +1892,25 @@ class FlyControlThread(Thread):
         """
         # !TODO: When the drone is at opposite side of the target. There might be an issue
         yaw = 0
-        
+
         target_yaw = 0
-        
-        
+
         if direction is None:
             if axis == Axis.X:
                 if dist.x < 0:
                     direction = Direction.POSITIVE
                 else:
                     direction = Direction.NEGATIVE
-                    
+
             else:
                 if dist.y < 0:
                     direction = Direction.NEGATIVE
                 else:
                     direction = Direction.POSITIVE
-        
-        
+
         target = AxisDirection(axis, direction)
         target_yaw = get_yaw_from_axis_direction(target)
-        
+
         if target_yaw == 0:
             move_yaw = current_yaw - target_yaw
             # Only turn if the yaw is not within the margin
@@ -1912,7 +1930,7 @@ class FlyControlThread(Thread):
                     yaw = -min(max_yaw, move_yaw)
                 else:
                     # turn right
-                    yaw = min(max_yaw, move_yaw)        
+                    yaw = min(max_yaw, move_yaw)
         elif target_yaw == 90:
             move_yaw = abs(current_yaw) - target_yaw
             if current_yaw < 0 and current_yaw > -90:
@@ -1938,7 +1956,6 @@ class FlyControlThread(Thread):
                     yaw = min(max_yaw, move_yaw)
                 else:
                     yaw = max(-max_yaw, -move_yaw)
-
 
         return yaw
 
@@ -1972,7 +1989,7 @@ class FlyControlThread(Thread):
         state_data = self._drone_state.to_csv()
         data = f'{cur_time},{state_data},{motion.to_csv()},{self.setting.hover_position.get().to_csv()},{self.setting.fly_mode.get()},"{self._current_command}","{self._extra_log}"'
         print(data, file=self._dump_flight_data_file)
-        
+
     def set_land_timeout(self, timeout: float):
         self._land_time_out = timeout
         self._land_timer = time.time()
@@ -1996,7 +2013,7 @@ class FlyControlThread(Thread):
     @property
     def fly_status(self) -> FlyStatus:
         return self._fly_control.fly_status
-    
+
     @fly_status.setter
     def fly_status(self, value: FlyStatus):
         self._fly_control.fly_status = value
