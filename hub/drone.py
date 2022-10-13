@@ -14,6 +14,7 @@ import jsonpickle
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.utils.uri_helper import uri_from_env
+from cflib.utils.power_switch import PowerSwitch
 from general.callbacks import Caller, VariableCallback
 from general.enum import Enum, IntEnum, auto
 from general.list import List
@@ -80,6 +81,11 @@ class FlyStatus(IntEnum):
 
     def __getstate__(self):
         return self.name
+
+
+class DronePowerAction(Enum):
+    POWER_OFF = auto()
+    REBOOT = auto()
 
 
 class FlyCommandManually(IntEnum):
@@ -418,6 +424,28 @@ class Drone:
         """
         for logger in self._logger.values():
             logger.stop() if logger is not None else None
+
+    def perform_power_action(self, action: DronePowerAction):
+        """ Set the power action to the drone
+        """
+        try:
+            if self.is_flying:
+                LOGGER.debug("Drone is flying. Cannot perform power action")
+                return
+
+            if self.is_connect:
+                self.disconnect()
+
+            match action:
+                case DronePowerAction.POWER_OFF:
+                    PowerSwitch(self._uri).platform_power_down()
+                case DronePowerAction.REBOOT:
+                    PowerSwitch(self._uri).stm_power_cycle()
+
+            LOGGER.debug(
+                f'Perform power action {action} on drone {self.uri}')
+        except Exception as e:
+            LOGGER.error(f"Error when performing power action: {e}")
 
     def voltage_monitor(self, drone_state: DroneInfo):
         """ This function monitor the voltage of the drone. If the drone is
@@ -763,7 +791,6 @@ class FlyControlSetting:
 
     avoid_trigger: VariableCallback = field(
         default_factory=lambda: VariableCallback([False, False, False, False]))
-
 
     # DEBUG purpose section
     # type Motion
@@ -1614,9 +1641,10 @@ class FlyControlThread(Thread):
             motion.vy = -velocity[2]
         elif velocity[3] != 0:
             motion.vy = velocity[3]
-            
+
         for count, v in enumerate(velocity):
-            self.setting.avoid_trigger.get()[count] = v != 0 # update the trigger status
+            # update the trigger status
+            self.setting.avoid_trigger.get()[count] = v != 0
 
         # avoidance trigger
         if velocity.count(0) != 4:
@@ -1710,7 +1738,7 @@ class FlyControlThread(Thread):
 
         if self._go_to_helper.action == GoToAction.REQUIRE_INIT or \
                 self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE\
-        or self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE:
+            or self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE:
 
             if self._go_to_helper.action == GoToAction.REQUIRE_INIT:
                 self._go_to_helper.reset()
