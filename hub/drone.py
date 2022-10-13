@@ -1540,7 +1540,7 @@ class FlyControlThread(Thread):
 
         return Line(p1, p2)
 
-    def _auto_avoidance_cal(self, dist: float, trigger_dist: float, min_dist: float):
+    def _auto_avoidance_cal(self, dist: float, trigger_dist: float, min_dist: float,velocity:float):
         """Core calculate of the auto avoidance. 
         (abs(distance - trigger) / (trigger - min) )^2
         The closer of the drone the faster the drone will avoid.
@@ -1549,8 +1549,9 @@ class FlyControlThread(Thread):
             distance (float): Distance to the drone
             trigger_dist (float): The distance determine the drone need to avoid
             min_dist: (float): Basically the drone frame
+            velocity: (float): The velocity of the drone
         """
-        return (abs(dist - trigger_dist) / (trigger_dist - min_dist)) ** 2
+        return (abs(dist - trigger_dist) / (trigger_dist - min_dist)) ** 2 * velocity
 
     def auto_avoidance(self, motion: Motion):
         """
@@ -1575,41 +1576,38 @@ class FlyControlThread(Thread):
         if dist_front < trigger_distance.x:
             dist_front = min_distance.x if dist_front < min_distance.x else dist_front
             velocity[0] = self._auto_avoidance_cal(
-                dist_front, trigger_distance.x, min_distance.x)
+                dist_front, trigger_distance.x, min_distance.x, avoid_velocity.vx)
 
         # Rear
         if dist_rear < trigger_distance.x:
             dist_rear = min_distance.x if dist_rear < min_distance.x else dist_rear
             velocity[1] = self._auto_avoidance_cal(
-                dist_rear, trigger_distance.x, min_distance.x)
+                dist_rear, trigger_distance.x, min_distance.x, avoid_velocity.vx)
 
         # Left
         if dist_left < trigger_distance.y:
             dist_left = min_distance.y if dist_left < min_distance.y else dist_left
             velocity[2] = self._auto_avoidance_cal(
-                dist_left, trigger_distance.y, min_distance.y)
+                dist_left, trigger_distance.y, min_distance.y, avoid_velocity.vy)
 
         # Right
         if dist_right < trigger_distance.y:
             dist_right = min_distance.y if dist_right < min_distance.y else dist_right
             velocity[3] = self._auto_avoidance_cal(
-                dist_right, trigger_distance.y, min_distance.y)
+                dist_right, trigger_distance.y, min_distance.y, avoid_velocity.vy)
 
         # Ensure it will not go beyond the max velocity
         if velocity[0] != 0:
-            motion.vx = - \
-                velocity[0] if velocity[0] < avoid_velocity.vx else - \
-                avoid_velocity.vx
+            motion.vx = -velocity[0]
 
         if velocity[1] != 0:
-            motion.vx = velocity[1] if velocity[1] < avoid_velocity.vx else avoid_velocity.vx
+            motion.vx = velocity[1]
 
         if velocity[2] != 0:
-            motion.vy = - \
-                velocity[2] if velocity[2] < avoid_velocity.vy else - \
-                avoid_velocity.vy
+            motion.vy = -velocity[2] 
+                
         if velocity[3] != 0:
-            motion.vy = velocity[3] if velocity[3] < avoid_velocity.vy else avoid_velocity.vy
+            motion.vy = velocity[3] 
 
         # avoidance trigger
         if velocity.count(0) != 4:
