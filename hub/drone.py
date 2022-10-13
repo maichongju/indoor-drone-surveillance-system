@@ -764,16 +764,6 @@ class FlyControlSetting:
     avoid_trigger: VariableCallback = field(
         default_factory=lambda: VariableCallback([False, False, False, False]))
 
-    @property
-    def fly_motion(self) -> Motion:
-        return self._fly_motion
-
-    @fly_motion.setter
-    def fly_motion(self, value: Motion):
-        self._fly_motion = value
-
-    def __post_init__(self):
-        self._fly_motion = Motion(0, 0, 0, 0)
 
     # DEBUG purpose section
     # type Motion
