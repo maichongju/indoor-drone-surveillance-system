@@ -1,11 +1,13 @@
 from __future__ import annotations
-from general.utils import Position
-from general.utils import position_from_dict
-from log.logger import LOGGER
-from dataclasses import dataclass
-from copy import deepcopy
+
 import json
+from copy import deepcopy
+from dataclasses import dataclass
+
 import jsonpickle
+from general.utils import Position, position_from_dict, create_file
+from log.logger import LOGGER
+
 
 @dataclass
 class Location:
@@ -53,6 +55,8 @@ def location_from_dict(json: dict) -> Location:
 
 class Locations:
 
+    _default_content: str = '[]'
+
     def __init__(self, locations_file: str = 'locations.json'):
         self._locations = []
         self.load(locations_file)
@@ -63,7 +67,13 @@ class Locations:
                 temp_locations = json.load(f)
                 self._load_from_dict(temp_locations)
         except FileNotFoundError:
-            LOGGER.info(f'location file ({locations_file}) not found.')
+            LOGGER.info(
+                f'location file ({locations_file}) not found. Creating new one.')
+            try:
+                create_file(locations_file, self._default_content)
+            except Exception as e:
+                LOGGER.debug(
+                    f'Create location file ({locations_file}) failed. {e}')
         except Exception:
             LOGGER.info(f"Couldn't load locations from {locations_file}.")
         finally:
@@ -134,7 +144,7 @@ class Locations:
             name (str): name to search
             position (Position): new location
         """
-        
+
         found = self.find(name)
         if found is not None:
             print('called')

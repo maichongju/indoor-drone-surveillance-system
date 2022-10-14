@@ -203,6 +203,7 @@ cflib
 cache
 export
 *.csv
+locations.json
 
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python
