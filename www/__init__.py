@@ -90,3 +90,4 @@ class WebError(Enum):
 
     INTERNAL_SERVER_ERROR = 'E00000', 'Internal Error'
     DEBUG_NOT_ENABLE = 'E00001', 'This endpoint is only available in debug mode'
+    INVALID_IP = 'E00002', 'Invalid IP'

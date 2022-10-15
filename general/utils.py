@@ -12,6 +12,10 @@ from cflib.drivers.crazyradio import Crazyradio
 
 from general.enum import IntEnum, Enum, auto
 
+import ipaddress
+
+import re
+
 
 @dataclass(frozen=True)
 class Position:
@@ -182,7 +186,7 @@ class AxisDirection:
             else:  # x-
                 return AxisDirection(Axis.Y, Direction.POSITIVE)
         else:
-            if self.direction == Direction.POSITIVE:    # y+
+            if self.direction == Direction.POSITIVE:  # y+
                 return AxisDirection(Axis.X, Direction.POSITIVE)
             else:  # y-
                 return AxisDirection(Axis.X, Direction.NEGATIVE)
@@ -416,3 +420,29 @@ def create_file(path: str, content: str | None = None):
     with open(path, 'w') as f:
         if content is not None:
             f.write(content)
+
+
+def validate_ip(ip: str) -> bool:
+    """Validate the ip address
+
+    Args:
+        ip (str): ip address
+
+    Returns:
+        bool: True if the ip is valid
+    """
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except ValueError:
+        return False
+
+
+def get_ip_address(string: str) -> str:
+    """
+    Get the ip address from the string
+    """
+    ip = re.findall(r'[0-9]+(?:\.[0-9]+){3}', string)
+    if len(ip) == 0:
+        return ''
+    return ip[0]

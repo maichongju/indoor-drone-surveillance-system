@@ -835,7 +835,7 @@ class VideoStream(QWidget):
         layout = QVBoxLayout()
         gb.setLayout(layout)
 
-        self.lbl_stream_url = QLabel(self._drone.stream)
+        self.lbl_stream_url = QLabel(self._drone.stream_url)
         self.lbl_stream_url.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(self.lbl_stream_url)
