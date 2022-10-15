@@ -206,5 +206,7 @@ export
 locations.json
 config.toml
 
+.idea
+
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python
