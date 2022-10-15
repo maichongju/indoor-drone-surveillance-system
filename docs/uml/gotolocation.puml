@@ -1,4 +1,4 @@
-@startuml
+@startuml go to location
 start
 note left
 fly mode must be go to location
@@ -9,13 +9,21 @@ endnote
 if (drone reach location) then (no)
 
     partition "Axis Alignment" {
-    if (state) is (""REQUIRE_INIT"") then
+        if (state) is (""REQUIRE_INIT"" \n""REQUIRE_AXIS_CHANGE""\n""REQUIRE_AXIS_CHANGE_OBSTACLE"") then
 
-        :set drone align with Y axis;
-        :Change state to 'AXIS_CHANGING';
-        else if (state)then (""REQUIRE_AXIS_CHANGE"")
-            : target axis = target_axis == Y ? X : Y;
+            if (state) is (""REQUIRE_INIT"") then
 
+            :set drone align with Y axis;
+            else if (state) then (""REQUIRE_AXIS_CHANGE"")
+                : target axis = target_axis == Y ? X : Y;
+            else if (state) then (""REQUIRE_AXIS_CHANGE_OBSTACLE"")
+                :Determine the direction to turn
+                base on the distance to the left and right
+                More Distance means more probability to move around 
+                the obstacle. If distance is equal, turn to the right;
+                :set flag for obstacle detected;
+            endif 
+            :Change state to 'AXIS_CHANGING';
         endif 
 
         if (state) is (AXIS_CHANGING) then
@@ -26,7 +34,7 @@ if (drone reach location) then (no)
             endnote
 
             if (drone aligned with target axis) then
-                :Change state to ""MOVING""";
+                :Change state to ""MOVING"";
             else (no)
             endif
 
@@ -35,6 +43,17 @@ if (drone reach location) then (no)
 
     partition "Drone Movement" {
         if (state) is (""MOVING"") then
+            if (avoiding obstacle) then (yes)
+                if (avoiding direction) is (not enough space) then
+                    :Move drone forward;
+                else 
+                    :set moving direction to 
+                    pre-avoid direction;
+                    :set avoiding obstacle to false
+                    set state to ""AXIS_CHANGING"";
+                endif
+            endif
+        else if (state) then (""HOLD"")
 
         endif
     }
