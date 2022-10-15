@@ -13,6 +13,8 @@ from ml.objectdetection import ObjectDetection
 from ml.objectdetection import Model
 from ml.objectdetection import Result
 
+from general.utils import get_ip_address
+
 
 @dataclass
 class StreamCallBacks:
@@ -151,6 +153,12 @@ class VideoStream:
         """Determine if the model is initialized.
         """
         return self._model is not None
+
+    @property
+    def ip(self) -> str:
+        if self._url is None:
+            return ''
+        return get_ip_address(self._url)
 
 
 @dataclass
