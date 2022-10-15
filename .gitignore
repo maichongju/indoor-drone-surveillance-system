@@ -204,6 +204,7 @@ cache
 export
 *.csv
 locations.json
+config.toml
 
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python
