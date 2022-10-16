@@ -24,3 +24,7 @@ Customize the configuration file `config.toml` to fit your needs. [Configuration
 ## REST API
 
 The application also contain a REST API that can be used to communicate with the software. More detail for the API can be find [here](docs/web/README.md).
+
+## Onboard Camera
+
+Detail of onboard camera can be found [here](pi-camera/readme.md).
