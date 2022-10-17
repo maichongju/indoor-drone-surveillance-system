@@ -23,8 +23,8 @@ battery_setting = {
 
     },
     DroneModel.CRAZYFILE: {
-        'low_voltage': 3.5,
-        'critical_voltage': 3.2
+        'low_voltage': 3.1,
+        'critical_voltage': 3.0
     }
 }
 
