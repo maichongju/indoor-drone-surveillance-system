@@ -21,7 +21,7 @@ from general.list import List
 from general.utils import (Axis, AxisDirection, Direction, Position, GDirection,
                            has_dongle, percentage_cal, rotate_axis_coord,
                            point_relevant_location_yaw, point_relevant_location,
-                           get_yaw_from_axis_direction)
+                           get_yaw_from_axis_direction, round_up)
 from general.debug import get_dump_flight_data_file
 from general.cflib import CFParameter
 from log import DroneInfo, LogVariable
@@ -700,6 +700,7 @@ class FlyControlVelocity:
 
     # type Motion
     max_velocity: VariableCallback = field(
+
         default_factory=lambda: VariableCallback(Motion(0.5, 0.5, 0.1, 360 / 10)))
 
     # type float
@@ -747,6 +748,10 @@ class FlyControlDistance:
     # type float
     yaw_min_correction_degree: VariableCallback = field(
         default_factory=lambda: VariableCallback(1))
+    
+    # type float
+    moving_side_maintain_distance: VariableCallback = field(
+        default_factory=lambda: VariableCallback(0.4))
 
     # type float
     take_off_height: VariableCallback = field(
@@ -1099,6 +1104,11 @@ class FlyControlGoToHelper:
 
     hold_position: Position | None = None
 
+    # Activate when the drone is moving to avoid obstacle
+    avoiding_obstacle: bool = False
+    # The direction need to pay attention with. use with `avoiding_obstacle`
+    obstacle_direction: Direction = Direction.POSITIVE
+
     __yaw_buffer_size = 10
 
     yaw_buffer = List(__yaw_buffer_size)
@@ -1113,6 +1123,7 @@ class FlyControlGoToHelper:
         self.moving_direction.axis = Axis.Y
         self.action = GoToAction.REQUIRE_INIT
         self.yaw_buffer.clear()
+        self.avoiding_obstacle = False
 
 
 class FlyControlThread(Thread):
@@ -1225,8 +1236,9 @@ class FlyControlThread(Thread):
                     current_position = self._drone_state.position
                     if current_position.z < self.setting.distance.take_off_height.get():
                         motion = self.get_hover_velocity(
-                            current_position, self.hover_position,
-                            override_z=self.setting.velocity.take_off_velocity.get())
+
+                            current_position, self.hover_position, override_z=self.setting.velocity.take_off_velocity.get())
+
                     else:
                         self.fly_status = FlyStatus.FLYING
                         self._fly_control.fly_mode = FlyMode.HOVER
@@ -1747,6 +1759,7 @@ class FlyControlThread(Thread):
         # Need to rotate to the target direction. always rotate to Y axis first
 
         if self._go_to_helper.action == GoToAction.REQUIRE_INIT or \
+
                 self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE \
                 or self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE:
 
@@ -1758,14 +1771,24 @@ class FlyControlThread(Thread):
                 else:
                     self._go_to_helper.moving_direction.axis = Axis.X
             elif self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE:
-                pass
+                # TODO determine which axis to rotate first
+                # Distance to left and right (left, right)
+                dist = (self._drone_state.left_distance,
+                        self._drone_state.right_distance)
+                dist = (round_up(dist[0], 5), round_up(dist[1], 5))
+                # the more distance the more likely can be move around the obstacle
+                if dist[1] >= dist[0]:
+                    self._go_to_helper.moving_direction = self._go_to_helper.moving_direction.rotate_right()
+                    self._go_to_helper.obstacle_direction = Direction.POSITIVE
+                else:
+                    self._go_to_helper.moving_direction = self._go_to_helper.moving_direction.rotate_left()
+                    self._go_to_helper.obstacle_direction = Direction.NEGATIVE
+                self._go_to_helper.avoiding_obstacle = True
+
             else:  # Require Axis Change
                 self._go_to_helper.moving_direction.axis = Axis.Y if self._go_to_helper.moving_direction.axis == Axis.X else Axis.X
 
-            self._go_to_helper.action = GoToAction.AXIS_CHANGING
-            self._go_to_helper.yaw_buffer.clear()
-            self._set_maintain_direction(False)
-            self.hover_position = self._drone_state.position
+            self.go_to_set_axis_changing()
 
         if self._go_to_helper.action == GoToAction.HOLD:
             # Hold the position until it is in the acceptable range. then do the next action
@@ -1806,50 +1829,65 @@ class FlyControlThread(Thread):
                 self.hover_position = Position(None, None, None)
                 # self._go_to_helper.hold_position = self._drone_state.position
 
-        if self._go_to_helper.action == GoToAction.MOVING:
+        elif self._go_to_helper.action == GoToAction.MOVING:
             # Obstacle detected need to change direction
             if self._drone_state.front_distance < turn_trigger_distance.x:
-                self._go_to_helper.action = GoToAction.REQUIRE_AXIS_CHANGE
+                self._go_to_helper.action = GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE
                 return motion
-            # Moving alone the X axis
-            if self._go_to_helper.moving_direction.axis == Axis.X:
 
-                thrust_percent = percentage_cal(
-                    dist_to_target_abs.x,
-                    max_value=hover_trigger_range.x,
-                    min_value=hover_min_range.x)
-                self._extra_log = f" To X. Thrust Percent: {thrust_percent}, dist_to_target.x: {dist_to_target.x}"
+            if not self._go_to_helper.avoiding_obstacle:
 
-                if thrust_percent == 0 or self._is_pass_target(
-                        self._go_to_helper.moving_direction, self._drone_state.position,
-                        self._go_to_helper.target_position):
-                    # starting approaching the target. Use the hold mode
-                    self._change_to_hold(self._drone_state.position,
-                                         GoToAction.REQUIRE_AXIS_CHANGE)
+                # Moving alone the X axis
+                if self._go_to_helper.moving_direction.axis == Axis.X:
 
+                    thrust_percent = percentage_cal(
+                        dist_to_target_abs.x,
+                        max_value=hover_trigger_range.x,
+                        min_value=hover_min_range.x)
+                    self._extra_log = f" To X. Thrust Percent: {thrust_percent}, dist_to_target.x: {dist_to_target.x}"
+
+                    if thrust_percent == 0 or self._is_pass_target(
+                            self._go_to_helper.moving_direction, self._drone_state.position, self._go_to_helper.target_position):
+                        # starting approaching the target. Use the hold mode
+                        self._change_to_hold(self._drone_state.position,
+                                             GoToAction.REQUIRE_AXIS_CHANGE)
+
+                    else:
+                        thrust_percent = thrust_percent ** 2
+                        vx = velocity.vx * thrust_percent
+                        motion.vx = vx
+                # Moving alone with Y axis
                 else:
-                    thrust_percent = thrust_percent ** 2
-                    vx = velocity.vx * thrust_percent
-                    motion.vx = vx
-            # Moving alone with Y axis
-            else:
 
-                thrust_percent = percentage_cal(
-                    dist_to_target_abs.y,
-                    max_value=hover_trigger_range.y,
-                    min_value=hover_min_range.y)
+                    thrust_percent = percentage_cal(
+                        dist_to_target_abs.y,
+                        max_value=hover_trigger_range.y,
+                        min_value=hover_min_range.y)
 
-                if thrust_percent == 0 or self._is_pass_target(
-                        self._go_to_helper.moving_direction, self._drone_state.position,
-                        self._go_to_helper.target_position):
-                    # starting approaching the target. Use the hold mode
-                    self._change_to_hold(
-                        self._drone_state.position, GoToAction.REQUIRE_AXIS_CHANGE)
+                    if thrust_percent == 0 or self._is_pass_target(
+                            self._go_to_helper.moving_direction, self._drone_state.position, self._go_to_helper.target_position):
+                        # starting approaching the target. Use the hold mode
+                        self._change_to_hold(
+                            self._drone_state.position, GoToAction.REQUIRE_AXIS_CHANGE)
 
+
+                    else:
+                        thrust_percent = thrust_percent ** 2
+                        vx = velocity.vy * thrust_percent
+                        motion.vx = vx
+            else:  # avoiding the obstacle
+                monitor_dist = self._drone_state.left_distance if self._go_to_helper.obstacle_direction == Direction.NEGATIVE \
+                                else self._drone_state.right_distance
+                                
+                if monitor_dist > self.setting.distance.moving_side_maintain_distance.get():
+                    if self._go_to_helper.obstacle_direction == Direction.NEGATIVE:
+                        self._go_to_helper.moving_direction = self._go_to_helper.moving_direction.rotate_right()
+                    else:
+                        self._go_to_helper.moving_direction = self._go_to_helper.moving_direction.rotate_left()
+                    self._go_to_helper.avoiding_obstacle = False
+                    self.go_to_set_axis_changing()
                 else:
-                    thrust_percent = thrust_percent ** 2
-                    vx = velocity.vy * thrust_percent
-                    motion.vx = vx
+                    motion = Motion.forward(self.setting.velocity.auto_velocity.get().vx)
 
         return motion
 
@@ -2023,6 +2061,12 @@ class FlyControlThread(Thread):
     def set_land_timeout(self, timeout: float):
         self._land_time_out = timeout
         self._land_timer = time.time()
+        
+    def go_to_set_axis_changing(self):
+        self._go_to_helper.action = GoToAction.AXIS_CHANGING
+        self._go_to_helper.yaw_buffer.clear()
+        self._set_maintain_direction(False)
+        self.hover_position = self._drone_state.position
 
     @property
     def setting(self) -> FlyControlSetting:
