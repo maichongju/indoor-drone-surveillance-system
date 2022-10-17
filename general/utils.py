@@ -12,6 +12,10 @@ from cflib.drivers.crazyradio import Crazyradio
 
 from general.enum import IntEnum, Enum, auto
 
+import ipaddress
+
+import re
+
 
 @dataclass(frozen=True)
 class Position:
@@ -123,7 +127,7 @@ class Position:
 class AxisDirection:
     axis: Axis | None = None
     direction: Direction | None = None
-    
+
     def is_complete(self) -> bool:
         """Determines if the axis and direction are set
         """
@@ -171,38 +175,37 @@ class AxisDirection:
             return AxisDirection(Axis.Y, Direction.POSITIVE)
         else:
             return AxisDirection(Axis.X, Direction.NEGATIVE)
-        
+
     def rotate_right(self) -> AxisDirection:
         if not self.is_complete():
             raise ValueError('Axis and direction must be set')
-        
+
         if self.axis == Axis.X:
-            if self.direction == Direction.POSITIVE: # x+
+            if self.direction == Direction.POSITIVE:  # x+
                 return AxisDirection(Axis.Y, Direction.NEGATIVE)
-            else: # x-
+            else:  # x-
                 return AxisDirection(Axis.Y, Direction.POSITIVE)
         else:
-            if self.direction == Direction.POSITIVE:    # y+
+            if self.direction == Direction.POSITIVE:  # y+
                 return AxisDirection(Axis.X, Direction.POSITIVE)
-            else: # y-
+            else:  # y-
                 return AxisDirection(Axis.X, Direction.NEGATIVE)
-    
+
     def rotate_left(self) -> AxisDirection:
         if not self.is_complete():
             raise ValueError('Axis and direction must be set')
-        
+
         if self.axis == Axis.X:
-            if self.direction == Direction.POSITIVE: # x+
+            if self.direction == Direction.POSITIVE:  # x+
                 return AxisDirection(Axis.Y, Direction.POSITIVE)
-            else: # x-
+            else:  # x-
                 return AxisDirection(Axis.Y, Direction.NEGATIVE)
         else:
-            if self.direction == Direction.POSITIVE: # y+
+            if self.direction == Direction.POSITIVE:  # y+
                 return AxisDirection(Axis.X, Direction.NEGATIVE)
-            else: # y-
+            else:  # y-
                 return AxisDirection(Axis.X, Direction.POSITIVE)
-            
-            
+
     def reset(self):
         self.axis = None
         self.direction = None
@@ -374,6 +377,7 @@ def point_relevant_location(p1: Position, p2: Position, yaw: float = 0) -> Tuple
 def ensure_folder_exist(path: str):
     Path(path).mkdir(parents=True, exist_ok=True)
 
+
 def get_yaw_from_axis_direction(axis_direction: AxisDirection) -> float:
     """Get the yaw from the axis direction
     """
@@ -390,12 +394,13 @@ def get_yaw_from_axis_direction(axis_direction: AxisDirection) -> float:
         else:
             return -90
 
-def round_up(n: int | float, round_num: int| float ) -> float|int:
+
+def round_up(n: int | float, round_num: int | float) -> float | int:
     """Round up to the nearest round_num
     Parameters:
         n (int|float): number to round up
         round_num (int|float): round to the nearest round_num
-    
+
     Example:
     >>> round_up(12, 10)
     20
@@ -404,3 +409,41 @@ def round_up(n: int | float, round_num: int| float ) -> float|int:
     """
     return round_num * math.ceil(n / round_num)
 
+
+def create_file(path: str, content: str | None = None):
+    """Create a file with the content (optional)
+
+    Args:
+        path (str): Path to the file 
+        content (str | None, optional): Content to be write. Defaults to None.
+    """
+
+    with open(path, 'w') as f:
+        if content is not None:
+            f.write(content)
+
+
+def validate_ip(ip: str) -> bool:
+    """Validate the ip address
+
+    Args:
+        ip (str): ip address
+
+    Returns:
+        bool: True if the ip is valid
+    """
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except ValueError:
+        return False
+
+
+def get_ip_address(string: str) -> str:
+    """
+    Get the ip address from the string
+    """
+    ip = re.findall(r'[0-9]+(?:\.[0-9]+){3}', string)
+    if len(ip) == 0:
+        return ''
+    return ip[0]

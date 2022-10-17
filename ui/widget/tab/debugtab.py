@@ -1,5 +1,5 @@
 from general.utils import AxisDirection
-from hub.drone import Drone, FlyControlMode, FlyMode, Motion, Position
+from hub.drone import Drone, FlyControlMode, FlyMode, Motion, Position, DronePowerAction
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QGridLayout,
                              QHBoxLayout, QLabel, QPushButton, QRadioButton)
@@ -145,10 +145,21 @@ class DebugTab(Tab):
         self.btn_start_path = QPushButton("Start")
         self.btn_start_path.clicked.connect(self._fly_path_on_click)
         main_layout.addWidget(self.btn_start_path, row, 1)
-        
-        
+
         row += 1
 
+        main_layout.addWidget(QLabel("Power Switch"), row, 0)
+        layout = QHBoxLayout()
+        self.btn_power_off = QPushButton("Off")
+        self.btn_power_off.clicked.connect(
+            lambda: self._power_action_on_click(DronePowerAction.POWER_OFF))
+        layout.addWidget(self.btn_power_off)
+        self.btn_reboot = QPushButton("Reboot")
+        self.btn_reboot.clicked.connect(
+            lambda: self._power_action_on_click(DronePowerAction.REBOOT))
+        layout.addWidget(self.btn_reboot)
+        main_layout.addLayout(layout, row, 1)
+        row += 1
 
     def _add_callbacks(self):
         self._setting.fly_mode.callbacks.add_callback(
@@ -244,14 +255,15 @@ class DebugTab(Tab):
     def _align_on_click(self, axis: AxisDirection):
         if self._drone.is_flying:
             self._drone.fly_control.debug_add_command(axis)
-            
+
     def _fly_path_on_click(self):
         path = Path()
-        path.add_points(Position(1,0,0.4))
-        path.add_points(Position(1,-1,0.4))
-        path.add_points(Position(0,-1,0.4))
-        path.add_points(Position(0,0,0.4))
+        path.add_points(Position(1, 0, 0.4))
+        path.add_points(Position(1, -1, 0.4))
+        path.add_points(Position(0, -1, 0.4))
+        path.add_points(Position(0, 0, 0.4))
         print("pressed")
         self._drone.fly_control.debug_add_command(path)
-        
-        
+
+    def _power_action_on_click(self, state: DronePowerAction):
+        self._drone.perform_power_action(state)

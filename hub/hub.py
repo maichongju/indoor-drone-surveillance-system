@@ -1,7 +1,7 @@
-
 import jsonpickle
 from config.config import Config
 from .drone import Drone
+from log.logger import LOGGER
 
 from cflib.crtp import init_drivers
 from cflib.drivers.crazyradio import Crazyradio
@@ -23,12 +23,9 @@ class Hub:
             drones[drone['name']] = Drone(drone['name'],
                                           drone['uri'],
                                           stream_url=drone['stream'],
-                                          debug = config.get_value('debug'),
+                                          debug=config.get_value('debug'),
                                           )
         return drones
-    
-    def drone_low_battery_cb(self, drone_id: str):
-        pass
 
     def disconnectAll(self):
         """Disconnect everything and exit
@@ -40,7 +37,7 @@ class Hub:
                 threads.append(thread)
                 thread.start()
 
-            # TODO Remove in the future
+                # TODO Remove in the future
                 thread = Thread(target=drone.stream_stop)
                 threads.append(thread)
                 thread.start()
@@ -67,6 +64,25 @@ class Hub:
         for name, drone in self._drones.items():
             d[name] = drone.get_basic_info()
         return d
+
+    def low_battery_notify(self, ip: str):
+        """This function is called when a onboard camera is on low battery. 
+        Args:
+            ip (str): ip address of the onboard camera
+        """
+        drone = None
+        for d in self._drones.values():  # type: Drone
+            if d.stream_ip == ip:
+                drone = d
+                break
+
+        if drone is None:
+            LOGGER.info(f'Low battery signal received, but no drone found for ip {ip}')
+            return
+
+        drone.onboard_low_voltage_cb.call()
+        LOGGER.debug(f'Low battery notification for {drone.name}@{ip}')
+
 
     def __getstate__(self) -> dict:
         """Get state for pickle

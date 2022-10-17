@@ -1,16 +1,14 @@
 from typing import Any
-from flask import Flask, Response, abort, jsonify, request
-import jsonpickle
-from enum import Enum
-from pytest import param
-from config.config import Config
-from log.logger import WEBLOGGER
-from . import HTTPStatus, WebError
-from werkzeug.exceptions import HTTPException
-from general.utils import is_number
-from copy import deepcopy
 
+import jsonpickle
+from config.config import Config
+from flask import Flask, Response, abort, request
 from hub.hub import Hub
+from log.logger import WEBLOGGER
+from werkzeug.exceptions import HTTPException
+
+from www import HTTPStatus, WebError
+from general.utils import validate_ip
 
 
 class FlaskApp():
@@ -46,6 +44,7 @@ class FlaskApp():
         self.add_end_point('/', 'index', self.index)
         self.add_end_point('/drones', 'drones', self.drones)
         self.add_end_point('/drone/<drone_id>', 'get_drone', self.get_drone)
+        self.add_end_point('/camera/low_battery', 'low_battery', self.onboard_camera_low_battery, methods=['POST'])
 
     def setup_debug_end_point(self):
         self.add_end_point('/debug/status/<int:code>',
@@ -76,8 +75,8 @@ class FlaskApp():
     def get_drone(self, drone_id: str):
         return self.make_response(f"{drone_id}")
 
-    def add_end_point(self, endPoint: str, endPointName: str, handler: callable):
-        self.app.add_url_rule(endPoint, endPointName, handler)
+    def add_end_point(self, end_point: str, end_point_name: str, handler: callable, **kwargs):
+        self.app.add_url_rule(end_point, end_point_name, handler, **kwargs)
 
     def make_response(self, data: Any,
                       status: HTTPStatus = HTTPStatus.OK,
@@ -95,7 +94,6 @@ class FlaskApp():
         """
         default_mimetype = 'application/json'
         d = {'status': status.value}
-        print(id(status))
         if error is None:
             try:
                 # Try to jsonfy the data
@@ -125,6 +123,18 @@ class FlaskApp():
         return Response(jsonpickle.encode(d, unpicklable=False),
                         status=status.value,
                         mimetype=default_mimetype)
+
+    def onboard_camera_low_battery(self):
+        """end point for drone to notify the server that the onboard camera is low on battery.
+        This endpoint only allow POST request.
+        """
+        ip: str = request.form.get('ip')
+        if not validate_ip(ip):
+            return self.make_response(None,
+                                      status=HTTPStatus.BAD_REQUEST,
+                                      error=WebError.INVALID_IP)
+        self._hub.low_battery_notify(ip)
+        return self.make_response(None, HTTPStatus.OK)
 
     def response_debug_not_enable(self):
         """Response for debug not enable
