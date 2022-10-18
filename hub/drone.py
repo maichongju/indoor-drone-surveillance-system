@@ -885,7 +885,7 @@ class FlyControl:
             self._control_thread.start()
 
         except Exception as e:
-            self._is_flying = False
+            self.fly_status = FlyStatus.LANDED
             raise e
 
     def land(self):
