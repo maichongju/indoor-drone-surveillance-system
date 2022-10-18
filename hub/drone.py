@@ -1759,7 +1759,6 @@ class FlyControlThread(Thread):
         # Need to rotate to the target direction. always rotate to Y axis first
 
         if self._go_to_helper.action == GoToAction.REQUIRE_INIT or \
-
                 self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE \
                 or self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE:
 
