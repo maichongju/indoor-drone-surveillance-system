@@ -169,7 +169,7 @@ class Canvas2DScatter(Canvas2D):
         super().plot(points)
         size = len(points[0])
         for i in range(size):
-            self.ax.scatter(points[0][i], points[1][i], c='#5895fc')
+            self.ax.scatter(points[0][i], points[1][i], c='#5895fc', s=2)
         self.draw()
 
 
