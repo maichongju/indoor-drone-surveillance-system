@@ -1,13 +1,12 @@
 from __future__ import annotations
+
+from dataclasses import dataclass
 from enum import Enum
-from statistics import mode
 from typing import Any
+
+import cv2
 import numpy as np
 import torch
-from dataclasses import dataclass, field
-import cv2
-import logging
-import debugpy
 
 from log.logger import LOGGER
 
@@ -149,7 +148,6 @@ class Model(Enum):
             ObjectDetection: `ObjectDetection` model. Check `error` to see if the model is loaded successfully.
         """
         if not isinstance(model, Model):
-
             return None
         match model:
             case Model.YOLOV5:
@@ -243,7 +241,7 @@ class ObjectDetection:
                         'cpu').numpy(), results.xyxyn[0][:, :-1].detach().to('cpu').numpy()
                 else:
                     labels, cord = results.xyxyn[0][:, -
-                                                    1].numpy(), results.xyxyn[0][:, :-1].numpy()
+                                                       1].numpy(), results.xyxyn[0][:, :-1].numpy()
                 # * label : [label]
                 # * cord : [x1, y1, x2, y2, prob]
                 return FrameResult(threshold, self._classes, labels, cord)
