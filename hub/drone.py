@@ -1561,7 +1561,7 @@ class FlyControlThread(Thread):
         if percentage == 0:
             return motion
 
-        velocity = velocity * percentage
+        velocity = velocity ** 2 * percentage
 
         # point on direction
         d_point = Position.from_point2d(direction.points[0])
