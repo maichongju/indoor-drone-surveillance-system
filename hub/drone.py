@@ -1774,7 +1774,7 @@ class FlyControlThread(Thread):
                 # Distance to left and right (left, right)
                 dist = (self._drone_state.left_distance,
                         self._drone_state.right_distance)
-                dist = (round_up(dist[0], 5), round_up(dist[1], 5))
+                dist = (round_up(dist[0], 0.05), round_up(dist[1], 0.05))
                 # the more distance the more likely can be move around the obstacle
                 if dist[1] >= dist[0]:
                     self._go_to_helper.moving_direction = self._go_to_helper.moving_direction.rotate_right()
