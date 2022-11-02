@@ -1248,7 +1248,7 @@ class FlyControlThread(Thread):
                     self._extra_log = 'Landing'
                     current_position = self._drone_state.position
 
-                    cur_time = time.time()
+                    cur_time = time.perf_counter()
                     if current_position.z < self.setting.distance.landing_cutoff_height.get() and \
                             cur_time - self._land_timer >= self._land_time_out:
                         self._send_stop_motor()
@@ -1280,10 +1280,10 @@ class FlyControlThread(Thread):
                         if self.manually_fly_time == 0:
                             # Start flying. Remove all setting for hover
                             self._fly_control.fly_mode = FlyMode.NORMAL
-                            self.manually_fly_time = time.time()
+                            self.manually_fly_time = time.perf_counter()
 
                         else:
-                            now = time.time()
+                            now = time.perf_counter()
 
                             if now - self.manually_fly_time > self.MANUALLY_HOLD_TIME:
                                 # Manually Finish
@@ -1388,7 +1388,7 @@ class FlyControlThread(Thread):
     def _send_fly_command(self, motion: Motion):
         self._z_base = self._get_z()
         self._z_velocity = motion.vz
-        self._z_base_time = time.time()
+        self._z_base_time = time.perf_counter()
 
         self._drone._scf.cf.commander.send_hover_setpoint(
             motion.vx, motion.vy, motion.yaw, self._get_z())
@@ -1399,7 +1399,7 @@ class FlyControlThread(Thread):
     def _get_z(self):
         """Calculate the current z position of the drone
         """
-        now = time.time()
+        now = time.perf_counter()
         return self._z_base + self._z_velocity * (now - self._z_base_time)
 
     def _get_command(self):
@@ -2059,8 +2059,8 @@ class FlyControlThread(Thread):
 
     def set_land_timeout(self, timeout: float):
         self._land_time_out = timeout
-        self._land_timer = time.time()
-        
+        self._land_timer = time.perf_counter()
+
     def go_to_set_axis_changing(self):
         self._go_to_helper.action = GoToAction.AXIS_CHANGING
         self._go_to_helper.yaw_buffer.clear()
