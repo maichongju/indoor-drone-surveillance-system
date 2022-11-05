@@ -738,7 +738,11 @@ class FlyControlDistance:
     # type Position
     # Distance for auto moving to turn. (Should be grater than auto_avoidance_trigger_distance)
     auto_turn_trigger_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Position(0.35, 0.35, 0.10)))
+        default_factory=lambda: VariableCallback(Position(0.4, 0.4, 0.10)))
+
+    # type float
+    auto_slow_distance: VariableCallback = field(
+        default_factory=lambda: VariableCallback(0.3))
 
     # type float
     # Distance for yaw correction
@@ -1833,16 +1837,15 @@ class FlyControlThread(Thread):
             if self._drone_state.front_distance < turn_trigger_distance.x:
                 self._go_to_helper.action = GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE
                 return motion
-
-            if not self._go_to_helper.avoiding_obstacle:
-
+            slow_dist: float = self.setting.distance.auto_slow_distance.get()
+            if not self._go_to_helper.avoiding_obstacle:  # Normal move
                 # Moving alone the X axis
                 if self._go_to_helper.moving_direction.axis == Axis.X:
 
                     thrust_percent = percentage_cal(
-                        dist_to_target_abs.x,
-                        max_value=hover_trigger_range.x,
-                        min_value=hover_min_range.x)
+                        -dist_to_target.x,
+                        max_value=slow_dist,
+                        min_value=0)
                     self._extra_log = f" To X. Thrust Percent: {thrust_percent}, dist_to_target.x: {dist_to_target.x}"
 
                     if thrust_percent == 0 or self._is_pass_target(
@@ -1857,11 +1860,10 @@ class FlyControlThread(Thread):
                         motion.vx = vx
                 # Moving alone with Y axis
                 else:
-
                     thrust_percent = percentage_cal(
-                        dist_to_target_abs.y,
-                        max_value=hover_trigger_range.y,
-                        min_value=hover_min_range.y)
+                        -dist_to_target.y,
+                        max_value=slow_dist,
+                        min_value=0)
 
                     if thrust_percent == 0 or self._is_pass_target(
                             self._go_to_helper.moving_direction, self._drone_state.position, self._go_to_helper.target_position):
