@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import time
+from random import choice
 from typing import List
 
+import numpy as np
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QHBoxLayout
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from vispy import scene
+from vispy.color import ColorArray
 
 from general.enum import Enum, auto
 from general.utils import ensure_folder_exist
@@ -219,3 +223,80 @@ class Canvas3D(FigureCanvas):
             f'{EXPORT_FOLDER}/{source_file_name}_3d_{cur_time}.png')
         LOGGER.debug(
             f'3D plot saved to {EXPORT_FOLDER}/{source_file_name}_3d_{cur_time}.png')
+
+
+class Canvas3DVispy(scene.SceneCanvas):
+    def __init__(self, plane_size: int = 10,
+                 x_range: tuple = (0, 5),
+                 y_range: tuple = (0, 5),
+                 z_range: tuple = (0, 1)):
+        super().__init__(keys='interactive', show=True)
+        self.unfreeze()
+        self._colors = [
+            ColorArray('#27CACE'), ColorArray('#872D85'),
+            ColorArray('#DB734B'), ColorArray('#5816BB'),
+            ColorArray('#BDAFED'), ColorArray('#B657C6'),
+            ColorArray('#079DE2'), ColorArray('#EE4881')]
+
+        self._view = self.central_widget.add_view()
+        self._view.bgcolor = '#ffffff'
+        self._view.camera = scene.TurntableCamera(
+            distance=10.0,
+            up='+z',
+        )
+        floor = scene.visuals.Plane(
+            width=plane_size,
+            height=plane_size,
+            width_segments=plane_size,
+            height_segments=plane_size,
+            color=(0.5, 0.5, 0.5, 0.1),
+            edge_color=(0.5, 0.5, 0.5, 0.5),
+            parent=self._view.scene)
+
+        xax = scene.Axis(pos=[[x_range[0], 0], [x_range[1], 0]], tick_direction=(0, -1), axis_color='r', tick_color='r',
+                         text_color='r',
+                         font_size=14, axis_label='x', parent=self._view.scene)
+        yax = scene.Axis(pos=[[0, y_range[0]], [0, y_range[1]]], tick_direction=(-1, 0), axis_color='g', tick_color='g',
+                         text_color='g',
+                         font_size=14, axis_label='y', parent=self._view.scene)
+
+        zax = scene.Axis(pos=[[z_range[0], 0], [-z_range[1], 0]], tick_direction=(0, -1), axis_color='b',
+                         tick_color='b', text_color='b',
+                         font_size=14, parent=self._view.scene)
+        zax.transform = scene.transforms.MatrixTransform()
+        zax.transform.rotate(90, (0, 1, 0))
+        zax.transform.rotate(-45, (0, 0, 1))
+
+        self.marker = None
+
+        self.freeze()
+
+    def plot_scatter(self, points: List):
+        if not isinstance(points, list) and \
+                not len(points) == 3 and \
+                not isinstance(points[0], list) and \
+                not isinstance(points[1], list) and \
+                not isinstance(points[2], list) and \
+                not len(points[0]) == len(points[1]) == len(points[2]):
+            raise TypeError(f'points must be a list with format [[x1,x2...,xn],[y1,y2...yn],[z1,z2...zn]]')
+        self.clear_marker()
+        marker = []
+
+        for x, y, z in zip(points[0], points[1], points[2]):
+            # self.add_marker(x, y, z)
+            marker.append((x, y, z))
+
+        scene.visuals.Markers(
+            pos=np.array(marker),
+            size=5,
+            face_color=ColorArray("#4d90fa"),
+            parent=self._view.scene,
+        )
+
+    def clear_marker(self):
+        if self.marker is not None:
+            self.marker.parent = None
+            self.marker = None
+
+    def get_random_color(self):
+        return choice(self._colors)

@@ -447,3 +447,32 @@ def get_ip_address(string: str) -> str:
     if len(ip) == 0:
         return ''
     return ip[0]
+
+
+def get_projection_point(line: Line, point: Position) -> Position:
+    """
+    Get the projection point of the point to the line
+    """
+    p = point.to_point2d()
+    project_p = line.projection(p)
+    return Position(project_p.x, project_p.y, point.z)
+
+
+def df_to_list(df: DataFrame, col_names: List) -> List:
+    """
+    Convert the dataframe to list for the given column names
+    Args:
+        df: Dataframe that contains the data
+        col_names: contain all the column names that need to be converted to list
+
+    Returns:
+        2D list of the data
+    """
+    if not isinstance(col_names, list):
+        raise TypeError('col_names must be a list')
+
+    result = []
+    for col_name in col_names:
+        result.append(df[col_name].tolist())
+
+    return result

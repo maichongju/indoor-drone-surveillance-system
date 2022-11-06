@@ -13,32 +13,29 @@ import jsonpickle
 # Crazyflie lib
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
-from cflib.utils.uri_helper import uri_from_env
 from cflib.utils.power_switch import PowerSwitch
-from general.callbacks import Caller, VariableCallback
-from general.enum import Enum, IntEnum, auto
-from general.list import List
-from general.utils import (Axis, AxisDirection, Direction, Position, GDirection,
-                           has_dongle, percentage_cal, rotate_axis_coord,
-                           point_relevant_location_yaw, point_relevant_location,
-                           get_yaw_from_axis_direction, round_up)
-from general.debug import get_dump_flight_data_file
-from general.cflib import CFParameter
-from log import DroneInfo, LogVariable
-from log.dronelogger import (BatteryLogger, CoreLogger, LocoLogger,
-                             MotorThrustLogger, MultiRangerLogger,
-                             PositionLogger)
-from .path import Path
-from log.logger import LOGGER
+from cflib.utils.uri_helper import uri_from_env
 from sympy import Line, Point
 
 from config.config import ConfigKey
-
+from general.callbacks import Caller, VariableCallback
+from general.cflib import CFParameter
+from general.debug import get_dump_flight_data_file
+from general.enum import IntEnum, auto
+from general.list import List
 from general.singleton import SINGLETON
-
+from general.utils import (Axis, AxisDirection, Direction, Position, GDirection,
+                           has_dongle, percentage_cal, rotate_axis_coord,
+                           point_relevant_location_yaw, point_relevant_location,
+                           get_yaw_from_axis_direction, round_up, get_projection_point)
 from hub.dronesetting import *
 from hub.firmware import Firmware
 from hub.stream import StreamCallBacks, VideoStream
+from log import DroneInfo, LogVariable
+from log.dronelogger import (BatteryLogger, CoreLogger, MotorThrustLogger, MultiRangerLogger,
+                             PositionLogger)
+from log.logger import LOGGER
+from .path import Path
 
 
 class DroneException(Exception):
@@ -412,9 +409,9 @@ class Drone:
                                                 drone_state=self._drone_info,
                                                 callback=self.drone_callbacks.battery_logger_callback)
 
-        self._logger['loco'] = LocoLogger(self._scf,
-                                          drone_state=self._drone_info,
-                                          callback=self.drone_callbacks.loco_logger_callback)
+        # self._logger['loco'] = LocoLogger(self._scf,
+        #                                   drone_state=self._drone_info,
+        #                                   callback=self.drone_callbacks.loco_logger_callback)
 
     def _start_logger(self):
         """Start logger
@@ -687,7 +684,7 @@ class FlyControlVelocity:
     # type Motion
     # max speed for each direction when in auto mode
     auto_velocity: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Motion(0.2, 0.2, 0.05, 360 / 20)))
+        default_factory=lambda: VariableCallback(Motion(0.15, 0.15, 0.05, 360 / 20)))
 
     # type Motion
     # auto avoidance speed
@@ -696,7 +693,7 @@ class FlyControlVelocity:
 
     # type Motion
     hover_correction_velocity: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Motion(0.05, 0.05, 0.05, 0)))
+        default_factory=lambda: VariableCallback(Motion(0.1, 0.1, 0.05, 0)))
 
     # type Motion
     max_velocity: VariableCallback = field(
@@ -723,7 +720,7 @@ class FlyControlDistance:
 
     # type Position
     hover_correction_max_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Position(0.05, 0.05, 0.05)))
+        default_factory=lambda: VariableCallback(Position(0.1, 0.1, 0.05)))
 
     # type Position
     # Distance for auto avoidance to trigger
@@ -752,10 +749,15 @@ class FlyControlDistance:
     # type float
     yaw_min_correction_degree: VariableCallback = field(
         default_factory=lambda: VariableCallback(1))
-    
+
     # type float
     moving_side_maintain_distance: VariableCallback = field(
         default_factory=lambda: VariableCallback(0.4))
+
+    # type float
+    # The margin distance that allows the drone to drift from the obstacle
+    obstacle_maintain_distance_margin: VariableCallback = field(
+        default_factory=lambda: VariableCallback(0.1))
 
     # type float
     take_off_height: VariableCallback = field(
@@ -1112,6 +1114,9 @@ class FlyControlGoToHelper:
     avoiding_obstacle: bool = False
     # The direction need to pay attention with. use with `avoiding_obstacle`
     obstacle_direction: Direction = Direction.POSITIVE
+    # A line to represent the line of the obstacle. Assume that the obstacle is a straight line, use
+    # this to avoid the drone drift to cause turn.
+    obstacle_line: Line | None = None
 
     __yaw_buffer_size = 10
 
@@ -1198,7 +1203,7 @@ class FlyControlThread(Thread):
                 if command == self.TERMINATE:
                     break
 
-                # Process command
+                # Manually Command
                 if isinstance(command, FlyCommandManually):
 
                     if self.setting.control_mode.get() != FlyControlMode.MANUALLY:
@@ -1208,15 +1213,15 @@ class FlyControlThread(Thread):
                     else:
                         self._current_command = command
                         self._fly_control.fly_mode = FlyMode.NORMAL
-
+                # Go to position command
                 elif isinstance(command, Position):  # Go to this position
                     self._current_command = command
                     self.setting.fly_mode.set(FlyMode.TARGET)
                     self._go_to_helper.reset()
                     self._go_to_helper.target_position = command
-                    print('Changed to target mode')
+
+                # Path command
                 elif isinstance(command, Path):
-                    print('Changed to path mode')
                     if not command.is_empty():
                         self._path = command
                         self._current_command = self._path.get_next_position()
@@ -1234,6 +1239,7 @@ class FlyControlThread(Thread):
                             f'[Fly Control] {self._drone.name} is not in debug mode')
                     else:
                         self._current_command = command
+                        self.set_hover(True)
 
                 if self.fly_status == FlyStatus.TAKING_OFF:
                     self._extra_log = 'Taking Off'
@@ -1241,7 +1247,8 @@ class FlyControlThread(Thread):
                     if current_position.z < self.setting.distance.take_off_height.get():
                         motion = self.get_hover_velocity(
 
-                            current_position, self.hover_position, override_z=self.setting.velocity.take_off_velocity.get())
+                            current_position, self.hover_position,
+                            override_z=self.setting.velocity.take_off_velocity.get())
 
                     else:
                         self.fly_status = FlyStatus.FLYING
@@ -1265,7 +1272,7 @@ class FlyControlThread(Thread):
                             current_position, self.hover_position, override_z=self.setting.velocity.land_velocity.get())
 
                 # Process motion
-                if self.fly_status == FlyStatus.FLYING:
+                elif self.fly_status == FlyStatus.FLYING:
 
                     # Drone might crashed into the obstacle
                     # if int(self._drone_state.thrust) == 0:
@@ -1305,6 +1312,7 @@ class FlyControlThread(Thread):
                     # Debug AxisDirection
                     if isinstance(self._current_command, AxisDirection):
                         axis: AxisDirection = self._current_command
+                        self._extra_log = f'Debug Rotate Axis'
                         if axis.axis == Axis.X and axis.direction == Direction.POSITIVE:
                             dist = Position(-5, 0, 0)
                         elif axis.axis == Axis.X and axis.direction == Direction.NEGATIVE:
@@ -1313,6 +1321,7 @@ class FlyControlThread(Thread):
                             dist = Position(0, 5, 0)
                         else:
                             dist = Position(0, -5, 0)
+
                         yaw = self._get_yaw(axis.axis,
                                             dist,
                                             self._drone_state.yaw,
@@ -1324,7 +1333,7 @@ class FlyControlThread(Thread):
                         if self.yaw_control_history.avg() == 0:
                             self._current_command = None
 
-                        motion = Motion(0, 0, 0, yaw)
+                        motion = motion + Motion(0, 0, 0, yaw)
 
                     # Debug End
 
@@ -1347,7 +1356,7 @@ class FlyControlThread(Thread):
 
                         motion = self.get_hover_velocity(
                             self._drone_state.position, self.hover_position,
-                            motion=None if self._fly_control.fly_mode == FlyMode.HOVER else motion)
+                            motion)
 
                     if self._maintain_direction is not None:
                         motion = self._direction_correction(motion)
@@ -1528,10 +1537,13 @@ class FlyControlThread(Thread):
         correct_velocity.vy = -correct_velocity.vy if distance.y > 0 else correct_velocity.vy
         correct_velocity.vz = -correct_velocity.vz if distance.z > 0 else correct_velocity.vz
         correct_velocity.vx = -correct_velocity.vx if distance.x > 0 else correct_velocity.vx
+        yaw = self._drone_state.yaw
+        # if motion.yaw != 0:
+        #     yaw -= motion.yaw / 2
 
         # Convert the global motion to local motion based on the current yaw.
         vx, vy = rotate_axis_coord(
-            correct_velocity.vx, correct_velocity.vy, -self._drone_state.yaw)
+            correct_velocity.vx, correct_velocity.vy, -yaw)
         correct_velocity.vx, correct_velocity.vy = vx, vy
 
         motion = motion + correct_velocity
@@ -1720,6 +1732,8 @@ class FlyControlThread(Thread):
         Returns:
             Position: next drone location
         """
+        # TODO Situation when the target position is near the obstacle. List it is at the distance less than
+        # avoid distance. 
         current_pos = self._drone_state.position
         target = self._go_to_helper.target_position
 
@@ -1774,7 +1788,7 @@ class FlyControlThread(Thread):
                 else:
                     self._go_to_helper.moving_direction.axis = Axis.X
             elif self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE:
-                # TODO determine which axis to rotate first
+
                 # Distance to left and right (left, right)
                 dist = (self._drone_state.left_distance,
                         self._drone_state.right_distance)
@@ -1813,17 +1827,17 @@ class FlyControlThread(Thread):
             motion = self.get_hover_velocity(self._drone_state.position,
                                              self.hover_position)
 
-            yaw = self._get_yaw(self._go_to_helper.moving_direction.axis,
-                                dist_to_target,
-                                current_yaw,
-                                yaw_margin,
-                                max_yaw)
+            yaw = self._get_yaw(axis=self._go_to_helper.moving_direction.axis,
+                                dist=dist_to_target,
+                                current_yaw=current_yaw,
+                                margin=yaw_margin,
+                                max_yaw=max_yaw)
 
             self._go_to_helper.yaw_buffer.append(yaw)
 
             motion.yaw = yaw
 
-            # Ensure the the average of yaw
+            # Ensure the average of yaw
             if self._go_to_helper.yaw_buffer.avg() == 0:
                 self._change_to_hold(self.hover_position, GoToAction.MOVING)
                 self._go_to_helper.moving_direction = AxisDirection.from_yaw(
@@ -1848,16 +1862,6 @@ class FlyControlThread(Thread):
                         min_value=0)
                     self._extra_log = f" To X. Thrust Percent: {thrust_percent}, dist_to_target.x: {dist_to_target.x}"
 
-                    if thrust_percent == 0 or self._is_pass_target(
-                            self._go_to_helper.moving_direction, self._drone_state.position, self._go_to_helper.target_position):
-                        # starting approaching the target. Use the hold mode
-                        self._change_to_hold(self._drone_state.position,
-                                             GoToAction.REQUIRE_AXIS_CHANGE)
-
-                    else:
-                        thrust_percent = thrust_percent ** 2
-                        vx = velocity.vx * thrust_percent
-                        motion.vx = vx
                 # Moving alone with Y axis
                 else:
                     thrust_percent = percentage_cal(
@@ -1865,22 +1869,26 @@ class FlyControlThread(Thread):
                         max_value=slow_dist,
                         min_value=0)
 
-                    if thrust_percent == 0 or self._is_pass_target(
-                            self._go_to_helper.moving_direction, self._drone_state.position, self._go_to_helper.target_position):
-                        # starting approaching the target. Use the hold mode
-                        self._change_to_hold(
-                            self._drone_state.position, GoToAction.REQUIRE_AXIS_CHANGE)
+                if thrust_percent == 0 or self._is_pass_target(
+                        self._go_to_helper.moving_direction, self._drone_state.position,
+                        self._go_to_helper.target_position):
+                    # starting approaching the target. Use the hold mode
+                    hover_pos = get_projection_point(self._maintain_direction, self._drone_state.position)
+                    self._change_to_hold(hover_pos,
+                                         GoToAction.REQUIRE_AXIS_CHANGE)
 
-
-                    else:
-                        thrust_percent = thrust_percent ** 2
-                        vx = velocity.vy * thrust_percent
-                        motion.vx = vx
+                else:
+                    thrust_percent = thrust_percent * 2
+                    vx = velocity.vy * thrust_percent
+                    motion.vx = vx
             else:  # avoiding the obstacle
                 monitor_dist = self._drone_state.left_distance if self._go_to_helper.obstacle_direction == Direction.NEGATIVE \
-                                else self._drone_state.right_distance
-                                
-                if monitor_dist > self.setting.distance.moving_side_maintain_distance.get():
+                    else self._drone_state.right_distance
+
+                # dist_to_wall = self._go_to_helper.obstacle_line.distance(current_pos.to_point2d())
+                # if dist_to_wall > self.setting.distance.obstacle_maintain_distance_margin.get() + self.setting.distance.moving_side_maintain_distance.get():
+                if monitor_dist > self.setting.distance.moving_side_maintain_distance.get() + \
+                        self.setting.distance.obstacle_maintain_distance_margin.get():
                     if self._go_to_helper.obstacle_direction == Direction.NEGATIVE:
                         self._go_to_helper.moving_direction = self._go_to_helper.moving_direction.rotate_right()
                     else:
@@ -2095,7 +2103,7 @@ class FlyControlThread(Thread):
 
     @property
     def hover_set(self) -> bool:
-        return self.hover_position.x != None and self.hover_position.y != None and self.hover_position.z != None
+        return self.hover_position.x is not None and self.hover_position.y is not None and self.hover_position.z is not None
 
     def __repr__(self) -> str:
         created_time = self._created_time.strftime("%Y-%m-%d %H:%M:%S")

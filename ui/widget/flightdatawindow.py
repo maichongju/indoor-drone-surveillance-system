@@ -4,7 +4,7 @@ from matplotlib.pyplot import set_loglevel
 
 set_loglevel('warning')
 
-from ui.widget.tab.threedplottab import ThreeDPlotTab
+from ui.widget.tab.threedplottab import ThreeDPlotVispyTab
 from ui.widget.tab.twodplottab import TwoDPlotTab
 
 # Must import this before importing matplotlib
@@ -43,7 +43,7 @@ class FlightDataWindow(QWidget):
         tab = QTabWidget(self)
         main_layout.addWidget(tab)
 
-        self.tab_3d = ThreeDPlotTab(self)
+        self.tab_3d = ThreeDPlotVispyTab(self)
         tab.addTab(self.tab_3d, self.tab_3d.name)
 
         self.tab_2d = TwoDPlotTab(self)
