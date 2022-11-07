@@ -28,6 +28,10 @@ class Location:
     def to_json(self, indent: int = 4) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, indent=indent)
 
+    @property
+    def text(self):
+        return self.name if self.name != '' else str(self.position)
+
     def __eq__(self, other: Location) -> bool:
         if not isinstance(other, Location):
             return False

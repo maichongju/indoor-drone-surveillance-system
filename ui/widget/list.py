@@ -6,6 +6,8 @@ from copy import deepcopy
 from PyQt6.QtWidgets import QListWidget
 from PyQt6.QtWidgets import QListWidgetItem
 
+from hub.location import LOCATIONS
+from hub.location import Location
 
 
 class LocationListWidget(QListWidget):
@@ -47,7 +49,7 @@ class LocationItem(QListWidgetItem):
     def __init__(self, location: Location, parent=None):
         super().__init__(parent)
         self.location = location
-        self.setText(location.name)
+        self.setText(location.text)
 
     def update(self):
-        self.setText(self.location.name)
+        self.setText(self.location.text)
