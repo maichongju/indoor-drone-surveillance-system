@@ -5,6 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 import jsonpickle
+
 from general.utils import Position, position_from_dict, create_file
 from log.logger import LOGGER
 
@@ -16,7 +17,7 @@ class Location:
     name: str
     position: Position
 
-    def __init__(self, name: str, position: Position):
+    def __init__(self,position: Position, name: str = ''):
         self.name = name
         self.position = deepcopy(position)
 
@@ -50,11 +51,10 @@ def location_from_dict(json: dict) -> Location:
     if 'name' not in json or 'position' not in json:
         raise ValueError('json must contain name and position')
 
-    return Location(json['name'], position_from_dict(json['position']))
+    return Location(name=json['name'], position=position_from_dict(json['position']))
 
 
 class Locations:
-
     _default_content: str = '[]'
 
     def __init__(self, locations_file: str = 'locations.json'):
