@@ -323,12 +323,16 @@ def rotate_axis_coord(x: float, y: float, degree: float):
 
     radian = math.radians(degree)
 
-    x, y = -y, x
+    # x, y = -y, x
+    #
+    # new_x = -x * math.cos(radian) + y * math.sin(radian)
+    # new_y = x * math.sin(radian) + y * math.cos(radian)
+    #
+    # return (new_y, new_x)
+    new_x = x * math.cos(radian) + y * math.sin(radian)
+    new_y = -x * math.sin(radian) + y * math.cos(radian)
 
-    new_x = -x * math.cos(radian) + y * math.sin(radian)
-    new_y = x * math.sin(radian) + y * math.cos(radian)
-
-    return (new_y, new_x)
+    return new_x, new_y
 
 
 def point_relevant_location_yaw(p1: Position, p2: Position, yaw: float) -> GDirection:
@@ -338,8 +342,8 @@ def point_relevant_location_yaw(p1: Position, p2: Position, yaw: float) -> GDire
         >>> point_location(Position(1,1), Position(2,1))
         POSITIVE
     """
-    p1 = rotate_axis_coord(p1.x, p1.y, -yaw)
-    p2 = rotate_axis_coord(p2.x, p2.y, -yaw)
+    p1 = rotate_axis_coord(p1.x, p1.y, yaw)
+    p2 = rotate_axis_coord(p2.x, p2.y, yaw)
 
     if p1[1] > p2[1]:  # right of p1
         return GDirection.EAST
@@ -354,8 +358,8 @@ def point_relevant_location(p1: Position, p2: Position, yaw: float = 0) -> Tuple
     """
 
     if yaw != 0:
-        temp_p1 = rotate_axis_coord(p1.x, p1.y, -yaw)
-        temp_p2 = rotate_axis_coord(p2.x, p2.y, -yaw)
+        temp_p1 = rotate_axis_coord(p1.x, p1.y, yaw)
+        temp_p2 = rotate_axis_coord(p2.x, p2.y, yaw)
         p1 = Position(temp_p1[0], temp_p1[1], p1.z)
         p2 = Position(temp_p2[0], temp_p2[1], p2.z)
 

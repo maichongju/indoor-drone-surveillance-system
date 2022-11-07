@@ -1543,7 +1543,7 @@ class FlyControlThread(Thread):
 
         # Convert the global motion to local motion based on the current yaw.
         vx, vy = rotate_axis_coord(
-            correct_velocity.vx, correct_velocity.vy, -yaw)
+            correct_velocity.vx, correct_velocity.vy, yaw)
         correct_velocity.vx, correct_velocity.vy = vx, vy
 
         motion = motion + correct_velocity
