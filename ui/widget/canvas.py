@@ -226,6 +226,8 @@ class Canvas3D(FigureCanvas):
 
 
 class Canvas3DVispy(scene.SceneCanvas):
+    TEXT_OFFSET = (0.1, 0.1, 0)
+
     def __init__(self, plane_size: int = 10,
                  x_range: tuple = (0, 5),
                  y_range: tuple = (0, 5),
@@ -268,6 +270,9 @@ class Canvas3DVispy(scene.SceneCanvas):
         zax.transform.rotate(-45, (0, 0, 1))
 
         self.marker = None
+        self.lines = []
+
+        self.plot_line([[1, 1, 1], [1, 2, 1], [2, 2, 1], [2, 1, 1]])
 
         self.freeze()
 
@@ -293,6 +298,56 @@ class Canvas3DVispy(scene.SceneCanvas):
             parent=self._view.scene,
         )
 
+    def plot_line(self, points: List, connect_head_tail: bool = False):
+        """
+        Draw the lines with the given points, lines are connected to each other in order
+        Args:
+            points: 2D list containing the points
+            connect_head_tail: connect the head and tail of the points
+        Returns:
+        """
+        if not isinstance(points, list):
+            raise TypeError(f'points must be a list with format [[x1,x2...,xn],[y1,y2...yn],[z1,z2...zn]]')
+        points = points.copy()
+        color = self.get_random_color()
+        if connect_head_tail:
+            points.append(points[0])
+
+        line = scene.visuals.Line(
+            pos=np.array(points),
+            color=color,
+            width=3,
+            parent=self._view.scene,
+        )
+
+        # No need to draw the text for the last point
+        if connect_head_tail:
+            points.pop()
+
+        marker = scene.visuals.Markers(
+            pos=np.array(points),
+            size=10,
+            face_color=color,
+            parent=self._view.scene,
+        )
+        line = VispyLine(line, marker)
+
+        for point in points:
+            string = f'({point[0]:.2f},{point[1]:.2f},{point[2]:.2f})'
+            text = scene.visuals.Text(
+                text=string,
+                pos=self._get_text_pos(point),
+                color='black',
+                font_size=10,
+                parent=self._view.scene,
+            )
+            line.add_text(text)
+
+        self.lines.append(line)
+
+    def _get_text_pos(self, point: tuple):
+        return point[0] + self.TEXT_OFFSET[0], point[1] + self.TEXT_OFFSET[1], point[2] + self.TEXT_OFFSET[2]
+
     def clear_marker(self):
         if self.marker is not None:
             self.marker.parent = None
@@ -300,3 +355,37 @@ class Canvas3DVispy(scene.SceneCanvas):
 
     def get_random_color(self):
         return choice(self._colors)
+
+
+class VispyLine:
+    """
+    Helper class to draw save information for a line in vispy.
+    """
+
+    def __init__(self, line: scene.Line, marker: scene.Markers = None, name: str = None):
+        self._parent = line.parent
+        self.line = line
+        self.text = []
+        self.marker = marker
+        self.name = name
+
+    def set_line_visible(self, visible: bool):
+        self.line.parent = self._parent if visible else None
+
+    def set_marker_visible(self, visible: bool):
+        if self.marker is not None:
+            self.marker.parent = self._parent if visible else None
+
+    def set_text_visible(self, visible: bool):
+        for text in self.text:
+            text.parent = self._parent if visible else None
+
+    def add_text(self, text: scene.Text):
+        self.text.append(text)
+
+    def clear(self):
+        self.line.parent = None
+        for t in self.text:  # type: scene.Text
+            t.parent = None
+        if self.marker is not None:
+            self.marker.parent = None
