@@ -1,11 +1,12 @@
 from __future__ import annotations
+
 from enum import Enum
 
 from PyQt6.QtGui import QIcon
-from .widget.utils import is_icon_valid
-from log.logger import LOGGER
 
-import logging
+from log.logger import LOGGER
+from .widget.utils import is_icon_valid
+
 
 class Icon(Enum):
     IMAGE_ERROR = './ui/icons/image_error.png'
@@ -28,6 +29,9 @@ class Icon(Enum):
     DOWNLOAD = './ui/icons/download.png'
     DESTINATION = './ui/icons/destination.png'
     STOP_SIGN = './ui/icons/stop_sign.png'
+    EDIT = './ui/icons/edit.png'
+    MINUS_SIGN = './ui/icons/minus_sign.png'
+    PLUS_SIGN = './ui/icons/plus_sign.png'
 
     @staticmethod
     def get_icon(icon: Icon):
