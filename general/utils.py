@@ -31,6 +31,10 @@ class Position:
     def from_point3d(point: Point3D) -> Position:
         return Position(point.x, point.y, point.z)
 
+    @staticmethod
+    def from_tuple(position: Tuple[float, float, float]) -> Position:
+        return Position(position[0], position[1], position[2])
+
     def distance(self, other: Position) -> float:
         if not isinstance(other, Position):
             raise TypeError('other must be Position')
@@ -73,6 +77,9 @@ class Position:
         """Return the Position object in json.
         """
         return json.dumps(self, default=lambda o: o.__dict__, indent=indent)
+
+    def copy(self) -> Position:
+        return Position(self.x, self.y, self.z)
 
     def __lt__(self, other: Position) -> bool:
         if not isinstance(other, Position):
