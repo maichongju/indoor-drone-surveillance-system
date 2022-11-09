@@ -244,24 +244,30 @@ class LocationEditDialog(QDialog):
         EDIT = 0,
         ADD = 1
 
-    def __init__(self, location: Location = None, parent=None, mode: Mode = Mode.EDIT):
+    def __init__(self,
+                 location: Location = None,
+                 parent=None,
+                 mode: Mode = Mode.EDIT,
+                 show_name: bool = True):
         super().__init__(parent)
         self.location = location
         self._is_update = mode == self.Mode.EDIT
         self.setWindowTitle("Edit Location" if self._is_update else "Add Location")
-        self._setup_ui()
+        self._setup_ui(show_name)
+        self._show_name = show_name
         self.setFixedSize(self.sizeHint())
 
-    def _setup_ui(self):
+    def _setup_ui(self, show_name):
 
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        name_layout = QHBoxLayout()
-        layout.addLayout(name_layout)
-        name_layout.addWidget(QLabel("Name:"))
-        self.le_name = QLineEdit(self.location.name if self.location is not None else "")
-        name_layout.addWidget(self.le_name)
+        if show_name:
+            name_layout = QHBoxLayout()
+            layout.addLayout(name_layout)
+            name_layout.addWidget(QLabel("Name:"))
+            self.le_name = QLineEdit(self.location.name if self.location is not None else "")
+            name_layout.addWidget(self.le_name)
 
         location_layout = QHBoxLayout()
         layout.addLayout(location_layout)
@@ -300,9 +306,23 @@ class LocationEditDialog(QDialog):
         """Ensure the input is valid. No duplicate name can exist in the list.
         """
 
-        if self.le_name.text() == "":
-            self.lbl_error.setText("Name cannot be empty")
-            return
+        # Check the name.
+        if self._show_name:
+            if self.le_name.text() == "":
+                self.lbl_error.setText("Name cannot be empty")
+                return
+            # For Location use case
+            if self._is_update:
+
+                if self.le_name.text() != self.location.name:
+                    if LOCATIONS.existed(self.le_name.text()):
+                        self.lbl_error.setText("Name already existed")
+                        return
+
+            else:
+                if LOCATIONS.existed(self.le_name.text()):
+                    self.lbl_error.setText("Name already existed")
+                    return
 
         if self.le_x.text() == "" or self.le_y.text() == "" or self.le_z.text() == "":
             self.lbl_error.setText("Position cannot be empty")
@@ -312,31 +332,13 @@ class LocationEditDialog(QDialog):
             self.lbl_error.setText("Position must be a number")
             return
 
-        if self._is_update:
-
-            if self.le_name.text() != self.location.name:
-                if LOCATIONS.existed(self.le_name.text()):
-                    self.lbl_error.setText("Name already existed")
-                    return
-
-            self.location.name = self.le_name.text()
-            self.location.position = Position(float(self.le_x.text()), float(self.le_y.text()), float(self.le_z.text()))
-
-        else:
-            if LOCATIONS.existed(self.le_name.text()):
-                self.lbl_error.setText("Name already existed")
-                return
-            self.location = Location(name=self.le_name.text(),
-                                     position=Position(float(self.le_x.text()), float(self.le_y.text()),
-                                                       float(self.le_z.text())))
+        self.location = Location(name=self.le_name.text(),
+                                 position=self._get_position())
 
         super().accept()
-    
-        
-        
 
+    def _get_position(self):
+        return Position(float(self.le_x.text()),
+                        float(self.le_y.text()),
+                        float(self.le_z.text()))
     
-        
-        
-        
-         
