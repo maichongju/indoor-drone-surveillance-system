@@ -332,7 +332,7 @@ class LocationEditDialog(QDialog):
             self.lbl_error.setText("Position must be a number")
             return
 
-        self.location = Location(name=self.le_name.text(),
+        self.location = Location(name=self.le_name.text() if self._show_name else "",
                                  position=self._get_position())
 
         super().accept()
