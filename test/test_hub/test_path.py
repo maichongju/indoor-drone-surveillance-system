@@ -23,8 +23,8 @@ class TestPathList:
                          connected=True)
             path2 = Path(name='test1',
                          positions=[Position(0, 1, 1), Position(1, 1, 1), Position(1, 0, 1)])
-            assert paths[0] == path1
-            assert paths[1] == path2
+            assert path1.is_identical(paths[0])
+            assert path2.is_identical(paths[1])
 
     def test_empty(self):
         with open(get_path('empty.json'), 'r') as file:
@@ -45,6 +45,6 @@ class TestPathList:
                          connected=True)
             path2 = Path(name='test1',
                          positions=[Position(0, 1, 1), Position(1, 1, 1), Position(1, 0, 1)])
-            assert paths1[0] == path1
-            assert paths1[1] == path2
+            assert path1.is_identical(paths1[0])
+            assert path2.is_identical(paths1[1])
 # TODO More tests

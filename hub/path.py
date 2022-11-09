@@ -50,11 +50,7 @@ class Path:
             'connected': self.connected
         }
 
-    @property
-    def positions(self):
-        return self._positions
-
-    def __eq__(self, other):
+    def is_identical(self, other):
         if not isinstance(other, Path):
             return False
 
@@ -67,6 +63,19 @@ class Path:
         for pos1, pos2 in zip(self._positions, other._positions):
             if pos1 != pos2:
                 return False
+
+        return True
+
+    @property
+    def positions(self):
+        return self._positions
+
+    def __eq__(self, other):
+        if not isinstance(other, Path):
+            return False
+
+        if self.name != other.name:
+            return False
 
         return True
 
