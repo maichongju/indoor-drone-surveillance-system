@@ -32,6 +32,7 @@ class Icon(Enum):
     EDIT = './ui/icons/edit.png'
     MINUS_SIGN = './ui/icons/minus_sign.png'
     PLUS_SIGN = './ui/icons/plus_sign.png'
+    DISKETTE = './ui/icons/diskette.png'
 
     @staticmethod
     def get_icon(icon: Icon):
