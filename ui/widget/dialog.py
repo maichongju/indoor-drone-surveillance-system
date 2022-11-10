@@ -1,19 +1,26 @@
 from enum import Enum, IntEnum
 
 from PyQt6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QLineEdit,
-                             QPushButton, QVBoxLayout)
+                             QPushButton, QVBoxLayout, QGroupBox, QMessageBox,
+                             QInputDialog)
 
 from general.utils import Axis, Position, is_number
 from hub.drone import Drone
 from hub.location import LOCATIONS, Location
+from hub.path import PathList, Path
 from ui.icon import Icon
-from ui.widget.list import LocationItem, LocationListWidget
+from ui.widget.canvas import Canvas3DVispy
+from ui.widget.list import LocationItem, LocationListWidget, PathDetailsListWidget, PathListWidget
 from ui.widget.utils import StylePreset, set_label_style
 from ui.widget.widget import PositionLabelEditSetWidget
 
 
 class _Icon(Enum):
     CURRENT_LOCATION = Icon.DOWNLOAD
+    ADD = Icon.PLUS_SIGN
+    REMOVE = Icon.MINUS_SIGN
+    EDIT = Icon.EDIT
+    SAVE = Icon.DISKETTE
 
 
 class GoToDialog(QDialog):
@@ -341,4 +348,198 @@ class LocationEditDialog(QDialog):
         return Position(float(self.le_x.text()),
                         float(self.le_y.text()),
                         float(self.le_z.text()))
-    
+
+
+DEFAULT_PATH_LOCATION = 'paths.json'
+
+
+class PathDialog(QDialog):
+    class _Mode(IntEnum):
+        PATH = 0
+        PATH_DETAIL = 1
+
+    def __init__(self, path_list: PathList, parent=None):
+        super().__init__(parent)
+
+        self._path_list = path_list
+        self.current_path = None
+        self._path_list_cur_index = -1
+        self._canvas_path = None
+
+        self.setWindowTitle("Path")
+        self._setup_ui()
+        self._set_enable_path_detail(False)
+        self.setFixedSize(self.sizeHint())
+
+    def _setup_ui(self):
+        main_layout = QHBoxLayout()
+        self.setLayout(main_layout)
+
+        self._path_list_ui = self._get_path_list_ui()
+        self._path_detail_ui = self._get_path_detail_ui()
+
+        left_layout = QVBoxLayout()
+        main_layout.addLayout(left_layout)
+
+        path_path_detail_layout = QHBoxLayout()
+        path_path_detail_layout.addWidget(self._path_list_ui)
+        path_path_detail_layout.addWidget(self._path_detail_ui)
+
+        left_layout.addLayout(path_path_detail_layout)
+
+        bottom_btn_layout = QHBoxLayout()
+        left_layout.addLayout(bottom_btn_layout)
+
+        bottom_btn_layout.addStretch()
+
+        btn_save = QPushButton("Save")
+        btn_save.clicked.connect(self._btn_save_onclick)
+        bottom_btn_layout.addWidget(btn_save)
+
+        btn_cancel = QPushButton("Cancel")
+        btn_cancel.clicked.connect(self.reject)
+        bottom_btn_layout.addWidget(btn_cancel)
+
+        self._canvas = Canvas3DVispy(size=(500, 300))
+
+        main_layout.addWidget(self._canvas.native)
+
+    def _get_path_list_ui(self) -> QGroupBox:
+        gb_path_list = QGroupBox("Paths")
+
+        gb_path_list_layout = QHBoxLayout()
+        gb_path_list.setLayout(gb_path_list_layout)
+
+        self.path_list = PathListWidget(self._path_list)
+        gb_path_list_layout.addWidget(self.path_list)
+        self.path_list.setMaximumWidth(100)
+        self.path_list.itemDoubleClicked.connect(lambda path: self._display_path(path.path))
+
+        paths_btn_layout = QVBoxLayout()
+        gb_path_list_layout.addLayout(paths_btn_layout)
+
+        btn_add_path = QPushButton("")
+        btn_add_path.setIcon(Icon.get_icon(_Icon.ADD.value))
+        btn_add_path.clicked.connect(lambda: self._btn_add_on_click(self._Mode.PATH))
+        paths_btn_layout.addWidget(btn_add_path)
+
+        btn_remove_path = QPushButton("")
+        btn_remove_path.setIcon(Icon.get_icon(_Icon.REMOVE.value))
+        btn_remove_path.clicked.connect(lambda: self._btn_remove_on_click(self._Mode.PATH))
+        paths_btn_layout.addWidget(btn_remove_path)
+
+        paths_btn_layout.addStretch()
+
+        return gb_path_list
+
+    def _get_path_detail_ui(self) -> QGroupBox:
+        gb_path_detail = QGroupBox("Path Detail")
+
+        gb_path_detail_layout = QHBoxLayout()
+        gb_path_detail.setLayout(gb_path_detail_layout)
+
+        self.path_detail = PathDetailsListWidget()
+        gb_path_detail_layout.addWidget(self.path_detail)
+        self.path_detail.setMaximumWidth(150)
+        self.path_detail.itemDoubleClicked.connect(lambda item: self._edit_location(item))
+        self.path_detail.currentItemChanged.connect(lambda cur, _: self._path_location_on_change(cur))
+
+        path_detail_btn_layout = QVBoxLayout()
+        gb_path_detail_layout.addLayout(path_detail_btn_layout)
+
+        btn_add_path_detail = QPushButton("")
+        btn_add_path_detail.setIcon(Icon.get_icon(_Icon.ADD.value))
+        btn_add_path_detail.clicked.connect(lambda: self._btn_add_on_click(self._Mode.PATH_DETAIL))
+        path_detail_btn_layout.addWidget(btn_add_path_detail)
+
+        btn_remove_path_detail = QPushButton("")
+        btn_remove_path_detail.setIcon(Icon.get_icon(_Icon.REMOVE.value))
+        btn_remove_path_detail.clicked.connect(lambda: self._btn_remove_on_click(self._Mode.PATH_DETAIL))
+        path_detail_btn_layout.addWidget(btn_remove_path_detail)
+
+        btn_save_path_detail = QPushButton("")
+        btn_save_path_detail.setIcon(Icon.get_icon(_Icon.SAVE.value))
+        btn_save_path_detail.clicked.connect(self._btn_save_path_detail_on_click)
+        path_detail_btn_layout.addWidget(btn_save_path_detail)
+
+        path_detail_btn_layout.addStretch()
+
+        return gb_path_detail
+
+    def _display_path(self, path: Path):
+        """
+        Helper function that will set up everything needs to display a path. This will also
+        display the path on the canvas.
+        """
+        if self._path_list_cur_index != -1 and self.path_detail.is_updated:
+            reply = QMessageBox.question(self, "Unsaved Changes",
+                                         "You have unsaved changes, do you want to save them?",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+            if reply == QMessageBox.StandardButton.Yes:
+                self._btn_save_path_detail_on_click()
+            elif reply == QMessageBox.StandardButton.Cancel:
+                self.path_detail.setCurrentRow(self._path_list_cur_index)
+                return
+        self._set_enable_path_detail(True)
+        self._path_detail_ui.setTitle(f"Path Detail - {path.name}")
+        self.path_detail.load(path)
+        self._path_list_cur_index = self.path_list.currentRow()
+        self._canvas_draw_path(path)
+
+    def _canvas_draw_path(self, path: Path):
+        """
+        Helper function that will draw the path on the canvas.
+        """
+        self._canvas_path = self._canvas.plot_path(path, vispy_path=self._canvas_path)
+
+    def _set_enable_path_detail(self, enable: bool):
+        self._path_detail_ui.setEnabled(enable)
+
+    def _btn_add_on_click(self, mode: _Mode):
+        if mode == self._Mode.PATH:
+            path_name, ok = QInputDialog.getText(self, "Create New Path", "Enter the name of the path")
+            if ok:
+                if self.path_list.paths.name_exists(path_name):
+                    QMessageBox.critical(self, "Error", "A path with this name already exists.")
+                else:
+                    path = Path(path_name)
+                    self.path_list.paths.add_path(path)
+                    self.path_list.addItem(path)
+                    self.path_list.setCurrentRow(self.path_list.count() - 1)
+                    self._display_path(path)
+
+
+    def _btn_remove_on_click(self, mode: _Mode):
+        pass
+
+    def _edit_location(self, item: LocationItem):
+        dialog = LocationEditDialog(location=item.location, parent=self, show_name=False)
+        if dialog.exec():
+            item.location = dialog.location
+            item.update()
+            self.path_detail.is_updated = True
+            self._path_detail_ui.setTitle(f"Path Detail - {self.path_detail.path.name} *")
+
+    def _path_on_click(self):
+        pass
+
+    def _path_location_on_change(self, location: Location):
+        pass
+
+    def _path_location_double_click(self, location: Location):
+        pass
+
+    def _btn_save_path_detail_on_click(self):
+        self.path_detail.update_positions()
+        self._path_detail_ui.setTitle(f"Path Detail - {self.path_detail.path.name}")
+
+    def _btn_save_onclick(self):
+        try:
+            with open(DEFAULT_PATH_LOCATION, 'w') as file:
+                self._path_list.save(file)
+            super().accept()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error when saving path ({e})")
+
+    def _btn_no_onclick(self):
+        super().reject()

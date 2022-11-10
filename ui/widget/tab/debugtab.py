@@ -1,10 +1,11 @@
-from general.utils import AxisDirection
-from hub.drone import Drone, FlyControlMode, FlyMode, Motion, Position, DronePowerAction
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QGridLayout,
                              QHBoxLayout, QLabel, QPushButton, QRadioButton)
-from ui.widget.tab.tab import Tab
+
+from general.utils import AxisDirection
+from hub.drone import Drone, FlyControlMode, FlyMode, Motion, Position, DronePowerAction
 from hub.path import Path
+from ui.widget.tab.tab import Tab
 
 
 class DebugTabSignal(QObject):
@@ -258,10 +259,10 @@ class DebugTab(Tab):
 
     def _fly_path_on_click(self):
         path = Path()
-        path.add_points(Position(1, 0, 0.4))
-        path.add_points(Position(1, -1, 0.4))
-        path.add_points(Position(0, -1, 0.4))
-        path.add_points(Position(0, 0, 0.4))
+        path.add_position(Position(1, 0, 0.4))
+        path.add_position(Position(1, -1, 0.4))
+        path.add_position(Position(0, -1, 0.4))
+        path.add_position(Position(0, 0, 0.4))
         print("pressed")
         self._drone.fly_control.debug_add_command(path)
 

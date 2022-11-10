@@ -12,7 +12,8 @@ from vispy import scene
 from vispy.color import ColorArray
 
 from general.enum import Enum, auto
-from general.utils import ensure_folder_exist
+from general.utils import ensure_folder_exist, Position
+from hub.path import Path
 from log.logger import LOGGER
 
 EXPORT_FOLDER = 'export'
@@ -231,8 +232,9 @@ class Canvas3DVispy(scene.SceneCanvas):
     def __init__(self, plane_size: int = 10,
                  x_range: tuple = (0, 5),
                  y_range: tuple = (0, 5),
-                 z_range: tuple = (0, 1)):
-        super().__init__(keys='interactive', show=True)
+                 z_range: tuple = (0, 1),
+                 size: tuple = (800, 600)):
+        super().__init__(keys='interactive', show=True, size=size)
         self.unfreeze()
         self._colors = [
             ColorArray('#27CACE'), ColorArray('#872D85'),
@@ -272,7 +274,7 @@ class Canvas3DVispy(scene.SceneCanvas):
         self.marker = None
         self.lines = []
 
-        self.plot_line([[1, 1, 1], [1, 2, 1], [2, 2, 1], [2, 1, 1]])
+        # self.plot_line([[1, 1, 1]])
 
         self.freeze()
 
@@ -283,7 +285,7 @@ class Canvas3DVispy(scene.SceneCanvas):
                 not isinstance(points[1], list) and \
                 not isinstance(points[2], list) and \
                 not len(points[0]) == len(points[1]) == len(points[2]):
-            raise TypeError(f'points must be a list with format [[x1,x2...,xn],[y1,y2...yn],[z1,z2...zn]]')
+            raise TypeError(f'points must be a list with format [[x1,y1,z1],[x2,y2,z2],...[xn,yn,zn]]')
         self.clear_marker()
         marker = []
 
@@ -298,39 +300,74 @@ class Canvas3DVispy(scene.SceneCanvas):
             parent=self._view.scene,
         )
 
-    def plot_line(self, points: List, connect_head_tail: bool = False):
+    def plot_line(self, points: List,
+                  connect_head_tail: bool = False,
+                  show_endpoint: bool = True,
+                  show_endpoint_text: bool = True,
+                  vline: VispyLine = None) -> VispyLine | None:
         """
-        Draw the lines with the given points, lines are connected to each other in order
+        Draw the lines with the given points, lines are connected to each other in order. If line is given,
+        then it will update the line instead creating a new one.
         Args:
+            vline: Vispy line to use for drawing
             points: 2D list containing the points
             connect_head_tail: connect the head and tail of the points
+            show_endpoint_text: Show the endpoint text
+            show_endpoint: Show the endpoint
         Returns:
         """
         if not isinstance(points, list):
-            raise TypeError(f'points must be a list with format [[x1,x2...,xn],[y1,y2...yn],[z1,z2...zn]]')
+            raise TypeError(f'points must be a list with format [[x1,y1,z1],[x2,y2,z2],...[xn,yn,zn]]')
+
+        if len(points) == 0:
+            if vline is not None:
+                vline.clear()
+            return None
+
         points = points.copy()
         color = self.get_random_color()
         if connect_head_tail:
             points.append(points[0])
 
-        line = scene.visuals.Line(
-            pos=np.array(points),
-            color=color,
-            width=3,
-            parent=self._view.scene,
-        )
+        if vline is None:
+            line = None
+            if len(points) != 0:
+                line = scene.visuals.Line(
+                    pos=np.array(points),
+                    color=color,
+                    width=3,
+                    parent=self._view.scene,
+                )
 
-        # No need to draw the text for the last point
-        if connect_head_tail:
-            points.pop()
+            # No need to draw the text for the last point
+            if connect_head_tail:
+                points.pop()
 
-        marker = scene.visuals.Markers(
-            pos=np.array(points),
-            size=10,
-            face_color=color,
-            parent=self._view.scene,
-        )
-        line = VispyLine(line, marker)
+            marker = scene.visuals.Markers(
+                pos=np.array(points),
+                size=10,
+                face_color=color,
+                parent=self._view.scene if show_endpoint else None,
+            )
+            line = VispyLine(line, marker)
+        else:
+            if vline.line is None:
+                vline.line = scene.visuals.Line(
+                    pos=np.array(points),
+                    color=color,
+                    width=3,
+                    parent=self._view.scene,
+                )
+            else:
+                vline.line.set_data(pos=np.array(points))
+
+            # No need to draw the text for the last point
+            if connect_head_tail:
+                points.pop()
+
+            vline.marker.set_data(pos=np.array(points))
+
+            vline.clear_text()
 
         for point in points:
             string = f'({point[0]:.2f},{point[1]:.2f},{point[2]:.2f})'
@@ -339,14 +376,31 @@ class Canvas3DVispy(scene.SceneCanvas):
                 pos=self._get_text_pos(point),
                 color='black',
                 font_size=10,
-                parent=self._view.scene,
+                parent=self._view.scene if show_endpoint_text else None,
             )
-            line.add_text(text)
-
-        self.lines.append(line)
+            line.add_text(text) if vline is None else vline.add_text(text)
+        return line if vline is None else vline
 
     def _get_text_pos(self, point: tuple):
         return point[0] + self.TEXT_OFFSET[0], point[1] + self.TEXT_OFFSET[1], point[2] + self.TEXT_OFFSET[2]
+
+    def plot_path(self, path: Path, vispy_path: VispyPath) -> VispyPath:
+        """
+        Plot the path
+        Args:
+            path:
+            vispy_path:
+
+        Returns:
+            VispyLine object representing the path
+        """
+        points = path.pos_to_list()
+        if vispy_path is None:
+            line = self.plot_line(points, connect_head_tail=path.connected)
+            return VispyPath(line, path, parent = self._view.scene)
+        else:
+            vispy_path.line = self.plot_line(points, connect_head_tail=path.connected, vline=vispy_path.line)
+            return vispy_path
 
     def clear_marker(self):
         if self.marker is not None:
@@ -363,22 +417,28 @@ class VispyLine:
     """
 
     def __init__(self, line: scene.Line, marker: scene.Markers = None, name: str = None):
-        self._parent = line.parent
+        self.parent = line.parent
         self.line = line
         self.text = []
         self.marker = marker
         self.name = name
 
     def set_line_visible(self, visible: bool):
-        self.line.parent = self._parent if visible else None
+        if self.line is not None:
+            self.line.parent = self.parent if visible else None
 
     def set_marker_visible(self, visible: bool):
         if self.marker is not None:
-            self.marker.parent = self._parent if visible else None
+            self.marker.parent = self.parent if visible else None
 
     def set_text_visible(self, visible: bool):
         for text in self.text:
-            text.parent = self._parent if visible else None
+            text.parent = self.parent if visible else None
+
+    def clear_text(self):
+        for text in self.text:
+            text.parent = None
+        self.text = []
 
     def add_text(self, text: scene.Text):
         self.text.append(text)
@@ -389,3 +449,25 @@ class VispyLine:
             t.parent = None
         if self.marker is not None:
             self.marker.parent = None
+
+
+class VispyPath:
+    def __init__(self, line: VispyLine, path: Path, parent):
+        self._parent = parent
+        self.line = line
+        self._path = path
+        self.highlight_pos = None
+
+    def set_highlight_pos(self, pos: Position):
+        if self.highlight_pos is not None:
+            self.highlight_pos.set_data(pos=np.array([pos.to_tuple()]))
+        else:
+            self.highlight_pos = scene.Markers(
+                pos=np.array([[0, 0, 0]]),
+                size=6,
+                face_color=ColorArray("#ff0000"),
+                parent=self._parent,
+            )
+
+    def update(self, path: Path):
+        pass

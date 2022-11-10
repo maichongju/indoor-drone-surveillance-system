@@ -1,12 +1,10 @@
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
-import logging
-from statistics import mean
-from general.list import List
 
 import jsonpickle
-from general.utils import Position, is_same_sign
-import json
+
+from general.utils import Position
 
 LOGGER_LEVEL_DRONE = logging.INFO + 5
 
@@ -85,6 +83,20 @@ class LogVariable(Enum):
     # Loco Position
     LOCO_MODE = 'loco.mode', LogTocType.UINT8
 
+    @property
+    def name(self) -> str:
+        """
+        Return the name of the variable.
+        """
+        return self.value[0]
+
+    @property
+    def type(self) -> LogTocType:
+        """
+        Return the type of the variable.
+        """
+        return self.value[1]
+
     @classmethod
     def get_multi_ranger(cls) -> list:
         """Generate list of multi ranger variables
@@ -123,9 +135,9 @@ class DroneInfo:
     """
     state: dict = field(default_factory=dict)
     _cache_state: dict = field(default_factory=lambda: {
-        LogVariable.POSITION_X.value[0]: List(1),
-        LogVariable.POSITION_Y.value[0]: List(1),
-        LogVariable.POSITION_Z.value[0]: List(1),
+        # LogVariable.POSITION_X.value[0]: List(1),
+        # LogVariable.POSITION_Y.value[0]: List(1),
+        # LogVariable.POSITION_Z.value[0]: List(1),
 
     })
 
@@ -141,26 +153,27 @@ class DroneInfo:
         ]
 
         for key, value in data.items():
-            if key in state_except:
-                self.state[key] = value
-                continue
-
+            # if key in state_except:
+            #     self.state[key] = value
+            #     continue
+            #
             if key in MULTI_RANGER_NAME and value > MAX_RANGE_OBSERVATION:
                 value = MAX_RANGE_OBSERVATION
-
-            if key not in self._cache_state:
-                self._cache_state[key] = List(5)
-            else:
-                # Check special value for yaw
-                if key == LogVariable.CORE_YAW.value[0]:
-                    if abs(value) > YAW_THRESHOLD:
-                        if len(self._cache_state[key]) > 0:
-                            if not is_same_sign(value, self._cache_state[key][-1]):
-                                self._cache_state[key].clear()
-
-                self._cache_state[key].append(value)
-
-            self.state[key] = self._cache_state[key].avg()
+            #
+            # if key not in self._cache_state:
+            #     self._cache_state[key] = List(1)  # Buffer size
+            # else:
+            #     # Check special value for yaw
+            #     if key == LogVariable.CORE_YAW.value[0]:
+            #         if abs(value) > YAW_THRESHOLD:
+            #             if len(self._cache_state[key]) > 0:
+            #                 if not is_same_sign(value, self._cache_state[key][-1]):
+            #                     self._cache_state[key].clear()
+            #
+            #     self._cache_state[key].append(value)
+            #
+            # self.state[key] = self._cache_state[key].avg()
+            self.state[key] = value
 
     def _mm_to_m(self, mm: float | None) -> float | None:
         """Convert mm to cm
@@ -182,7 +195,7 @@ class DroneInfo:
             str: Drone info in json format 
         """
         return jsonpickle.encode(self.__getstate__(), unpicklable=False, indent=indent)
-    
+
     def to_csv_header(self) -> str:
         """Get the csv header
 
@@ -190,7 +203,7 @@ class DroneInfo:
             str: csv header
         """
         return ','.join(self.state.keys())
-    
+
     def to_csv(self) -> str:
         """Get the csv value
 

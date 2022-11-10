@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TextIO
+from typing import TextIO, Tuple
 
 import jsonpickle
 
@@ -21,9 +21,9 @@ class Path:
 
         if positions is not None:
             for position in positions:
-                self.add_points(position)
+                self.add_position(position)
 
-    def add_points(self, point: Position):
+    def add_position(self, point: Position):
         if not isinstance(point, Position):
             raise TypeError('point must be Position')
         self._positions.append(point.copy())
@@ -36,6 +36,16 @@ class Path:
         point = self._positions[self._current]
         self._current += 1
         return point
+
+    def replace_pos_all(self, pos: list[Position]):
+        """
+        Replace all the positions in the path with the given list of positions
+        Args:
+            pos: list of positions to replace
+        """
+        self._positions = []
+        for p in pos:
+            self.add_position(p.copy())
 
     def is_empty(self) -> bool:
         return len(self._positions) == 0
@@ -65,6 +75,14 @@ class Path:
                 return False
 
         return True
+
+    def pos_to_list(self) -> list[Tuple[float, float, float]]:
+        """Convert the position list to a list of tuples
+
+        Returns:
+            list[Tuple[float, float, float]]: list of tuples
+        """
+        return [p.to_tuple() for p in self._positions]
 
     @property
     def positions(self):
@@ -116,7 +134,6 @@ class PathList:
                 positions.append(Position(pos['x'], pos['y'], pos['z']))
 
             self._paths.append(Path(name, positions, connected))
-        raise TypeError('path must be Path or dict')
 
     @staticmethod
     def load(file: TextIO) -> PathList:
@@ -137,7 +154,7 @@ class PathList:
                 except KeyError as e:
                     LOGGER.error(f'Fail to load path {path.get("name", "")} {e}')
                 except TypeError as e:
-                    LOGGER.error(f'Fail to load path. Invalid entry.')
+                    LOGGER.error(f'Fail to load path. Invalid entry. {e}')
 
         except json.JSONDecodeError as e:
             LOGGER.error(f'Failed to load path file: {e}. Invalid json.')
@@ -146,6 +163,19 @@ class PathList:
             LOGGER.error(f'Failed to load path file: {e}. Invalid json. Needs to be a list')
 
         return path_list
+
+    def find_index(self, path: Path) -> int:
+        for i, p in enumerate(self._paths):
+            if p == path:
+                return i
+
+        return -1
+
+    def name_exists(self, name: str) -> bool:
+        for path in self._paths:
+            if path.name == name:
+                return True
+        return False
 
     def save(self, file: TextIO):
         """
@@ -172,5 +202,5 @@ class PathList:
         return len(self._paths) == 0
 
     @property
-    def paths(self):
+    def raw_paths(self):
         return self._paths

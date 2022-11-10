@@ -4,6 +4,7 @@
 import logging
 from logging import Handler
 
+import jsonpickle
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon, QTextCursor
 from PyQt6.QtWidgets import (QApplication, QGroupBox, QHBoxLayout, QMainWindow,
@@ -11,17 +12,20 @@ from PyQt6.QtWidgets import (QApplication, QGroupBox, QHBoxLayout, QMainWindow,
                              QTabWidget, QVBoxLayout, QWidget)
 
 from config import Config
-from general.utils import has_dongle
+from general.utils import has_dongle, ensure_file_exist
 from hub.hub import Hub
 from hub.location import LOCATIONS
+from hub.path import PathList
 from log.logger import LOGGER
 from ui.widget.debugwindow import DebugWindow
-from ui.widget.dialog import LocationDialog
+from ui.widget.dialog import LocationDialog, PathDialog
 from ui.widget.flightdatawindow import FlightDataWindow
 from ui.widget.tab.dronetab import DroneWidget
 from ui.widget.tab.monitortab import MonitorTab
 from ui.widget.tunepid import TunePID
 
+PATH_FILE_PATH = "paths.json"
+PATH_FILE_DEFAULT = []
 
 class GUI(QApplication):
     def __init__(self, hub: Hub, config: Config, start_check=True):
@@ -132,11 +136,15 @@ class MainWindow(QMainWindow):
 
         file_menu.addAction(exit_action)
 
-        location_menu = menu_bar.addMenu('&Location')
+        position_menu = menu_bar.addMenu('&Position')
 
-        location_setting_action = QAction('&Setting', location_menu)
+        location_setting_action = QAction('&Location', position_menu)
         location_setting_action.triggered.connect(self._show_location_dialog)
-        location_menu.addAction(location_setting_action)
+        position_menu.addAction(location_setting_action)
+
+        path_setting_action = QAction('&Path', position_menu)
+        path_setting_action.triggered.connect(self._show_path_dialog)
+        position_menu.addAction(path_setting_action)
 
         tool_menu = menu_bar.addMenu('&Tool')
 
@@ -183,6 +191,14 @@ class MainWindow(QMainWindow):
 
     def _show_location_dialog(self):
         dialog = LocationDialog(self)
+        value = dialog.exec()
+
+    def _show_path_dialog(self):
+        raw_path = jsonpickle.encode(PATH_FILE_DEFAULT, unpicklable=False)
+        ensure_file_exist(PATH_FILE_PATH, raw_path)
+        with open(PATH_FILE_PATH) as f:
+            path = PathList.load(f)
+        dialog = PathDialog(path_list=path, parent=self)
         value = dialog.exec()
 
     def _show_flight_data_plot(self):

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from hub import Hub
-from .tab.debugtab import DebugTab
-
 from PyQt6.QtWidgets import QTabWidget
 from PyQt6.QtWidgets import QVBoxLayout
 from PyQt6.QtWidgets import QWidget
+
+from hub.hub import Hub
+from .tab.debugtab import DebugTab
 
 
 class DebugWindow(QWidget):
