@@ -118,16 +118,16 @@ class PathDetailsListWidget(QListWidget):
         """
         Load the path into the list.
         """
-        self._reset()
+        self.clear()
         self.path = path
         for pos in self.path.positions:
             location = Location(pos)
             item = LocationItem(location)
             super().addItem(item)
 
-    def _reset(self) -> None:
+    def clear(self) -> None:
         """Reset the list."""
-        self.clear()
+        super().clear()
         self.path = None
         self.is_updated = False
 
