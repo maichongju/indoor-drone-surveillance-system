@@ -109,7 +109,7 @@ class PathItem(QListWidgetItem):
 class PathDetailsListWidget(QListWidget):
     def __init__(self, path: Path = None, parent=None):
         super().__init__(parent=parent)
-        self.path = None
+        self.path: Path | None = None
         self.is_updated = False
         if path is not None:
             self.load(path)
@@ -131,12 +131,22 @@ class PathDetailsListWidget(QListWidget):
         self.path = None
         self.is_updated = False
 
-
     def addItem(self, position: Position):
         location = Location(position)
         item = LocationItem(location)
         super().addItem(item)
         self.path.add_position(position)
+
+    def insertItem(self, row: int, position: Position) -> None:
+        location = Location(position)
+        item = LocationItem(location)
+        super().insertItem(row, item)
+        self.path.insert_position(row, position)
+
+    def takeItem(self, row: int) -> QListWidgetItem:
+        item = super().takeItem(row)
+        self.path.positions.pop(row)
+        return item
 
     def remove(self, index: int):
         """Remove the item at the given index."""

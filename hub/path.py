@@ -28,6 +28,15 @@ class Path:
             raise TypeError('point must be Position')
         self._positions.append(point.copy())
 
+    def insert_position(self, index:int, position: Position):
+        """
+        Insert a position in the given position
+        Args:
+            index: Index that needs to be inserted
+            position: position object needs to be inserted
+        """
+        self._positions.insert(index, position)
+
     def get_next_position(self) -> Position | None:
         """ Get the next point in the path. If there is no next point, `None` is returned. 
         """

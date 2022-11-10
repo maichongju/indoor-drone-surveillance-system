@@ -21,6 +21,8 @@ class _Icon(Enum):
     REMOVE = Icon.MINUS_SIGN
     EDIT = Icon.EDIT
     SAVE = Icon.DISKETTE
+    UP = Icon.UP_ARROW
+    DOWN = Icon.DOWN_ARROW
 
 
 class GoToDialog(QDialog):
@@ -457,6 +459,16 @@ class PathDialog(QDialog):
         btn_remove_path_detail.clicked.connect(lambda: self._btn_remove_on_click(self._Mode.PATH_DETAIL))
         path_detail_btn_layout.addWidget(btn_remove_path_detail)
 
+        btn_move_up = QPushButton("")
+        btn_move_up.setIcon(Icon.get_icon(_Icon.UP.value))
+        btn_move_up.clicked.connect(lambda: self.move_path_position("up"))
+        path_detail_btn_layout.addWidget(btn_move_up)
+
+        btn_move_down = QPushButton("")
+        btn_move_down.setIcon(Icon.get_icon(_Icon.DOWN.value))
+        btn_move_down.clicked.connect(lambda: self.move_path_position("down"))
+        path_detail_btn_layout.addWidget(btn_move_down)
+
         btn_save_path_detail = QPushButton("")
         btn_save_path_detail.setIcon(Icon.get_icon(_Icon.SAVE.value))
         btn_save_path_detail.clicked.connect(self._btn_save_path_detail_on_click)
@@ -507,6 +519,32 @@ class PathDialog(QDialog):
                     self.path_list.addItem(path)
                     self.path_list.setCurrentRow(self.path_list.count() - 1)
                     self._display_path(path)
+        elif mode == self._Mode.PATH_DETAIL:
+            dialog = LocationEditDialog(parent=self, mode=LocationEditDialog.Mode.ADD, show_name=False)
+            if dialog.exec():  # New path is created
+                pos = dialog.location.position
+                if self.path_detail.currentRow() == -1:
+                    self.path_detail.addItem(pos)
+                    self.path_detail.setCurrentRow(0)
+                else:
+                    self.path_detail.insertItem(self.path_detail.currentRow(), pos)
+                    self.path_detail.setCurrentRow(self.path_detail.currentRow() - 1)
+
+                self._set_path_detail_is_updated(True)
+                self._update_path_detail_canvas()
+
+    def _update_path_detail_canvas(self):
+        """
+        Trigger a redrawn of the path on the canvas.
+        """
+        pass
+
+    def _set_path_detail_is_updated(self, is_updated: bool):
+        self.path_detail.is_updated = is_updated
+        if is_updated:
+            self._path_detail_ui.setTitle(f"Path Detail - {self.path_detail.path.name} *")
+        else:
+            self._path_detail_ui.setTitle(f"Path Detail - {self.path_detail.path.name}")
 
     def _btn_remove_on_click(self, mode: _Mode):
         if mode == self._Mode.PATH:
@@ -534,6 +572,14 @@ class PathDialog(QDialog):
                     self._path_detail_ui.setTitle("Path Detail")
                     self._path_detail_ui.setEnabled(False)
 
+        elif mode == self._Mode.PATH_DETAIL:
+            if self.path_detail.currentRow() == -1:
+                return
+            current_index = self.path_detail.currentRow()
+            self.path_detail.takeItem(current_index)
+
+            self._set_path_detail_is_updated(True)
+
     def clear_canvas(self):
         if self._canvas_path is not None:
             self._canvas_path.clear()
@@ -556,9 +602,16 @@ class PathDialog(QDialog):
     def _path_location_double_click(self, location: Location):
         pass
 
+    def move_path_position(self, direction: str):
+        if direction == "up":
+            pass
+        elif direction == "down":
+            pass
+
     def _btn_save_path_detail_on_click(self):
         self.path_detail.update_positions()
         self._path_detail_ui.setTitle(f"Path Detail - {self.path_detail.path.name}")
+        self.path_detail.is_updated = False
 
     def _btn_save_onclick(self):
         try:
