@@ -1,20 +1,19 @@
 from __future__ import annotations
 
+import ipaddress
 import json
 import math
+import re
 from dataclasses import dataclass
-from typing import Tuple
 from pathlib import Path
-
-from sympy import Point2D, Point3D
+from typing import List
+from typing import Tuple
 
 from cflib.drivers.crazyradio import Crazyradio
+from pandas import DataFrame
+from sympy import Point2D, Point3D, Line
 
 from general.enum import IntEnum, Enum, auto
-
-import ipaddress
-
-import re
 
 
 @dataclass(frozen=True)
@@ -122,6 +121,9 @@ class Position:
         z = f'{self.z:.3f}' if self.z is not None else 'None'
         return f'{x},{y},{z}'
 
+    def to_tuple(self):
+        return self.x, self.y, self.z
+
     def __str__(self) -> str:
         x = f'{self.x:.3f}' if self.x is not None else 'None'
         y = f'{self.y:.3f}' if self.y is not None else 'None'
@@ -212,6 +214,20 @@ class AxisDirection:
                 return AxisDirection(Axis.X, Direction.NEGATIVE)
             else:  # y-
                 return AxisDirection(Axis.X, Direction.POSITIVE)
+
+    def get_unit_vector(self) -> Point2D:
+        if not self.is_complete():
+            raise ValueError('Axis and direction must be set')
+        if self.axis == Axis.X:
+            if self.direction == Direction.POSITIVE:
+                return Point2D(1, 0)
+            else:
+                return Point2D(-1, 0)
+        else:
+            if self.direction == Direction.POSITIVE:
+                return Point2D(0, 1)
+            else:
+                return Point2D(0, -1)
 
     def reset(self):
         self.axis = None
@@ -432,6 +448,20 @@ def create_file(path: str, content: str | None = None):
     with open(path, 'w') as f:
         if content is not None:
             f.write(content)
+
+
+def ensure_file_exist(path: str, content: str | None = None):
+    """Ensure the file exist. If not, create it
+
+    Args:
+        path (str): Path to the file
+        content (str | None, optional): Content to be write. Defaults to None.
+    """
+    try:
+        with open(path, 'r'):
+            pass
+    except FileNotFoundError:
+        create_file(path, content)
 
 
 def validate_ip(ip: str) -> bool:
