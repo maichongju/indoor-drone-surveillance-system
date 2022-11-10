@@ -593,13 +593,7 @@ class PathDialog(QDialog):
             self.path_detail.is_updated = True
             self._path_detail_ui.setTitle(f"Path Detail - {self.path_detail.path.name} *")
 
-    def _path_on_click(self):
-        pass
-
     def _path_location_on_change(self, location: Location):
-        pass
-
-    def _path_location_double_click(self, location: Location):
         pass
 
     def move_path_position(self, direction: str):
