@@ -463,11 +463,18 @@ class VispyPath:
             self.highlight_pos.set_data(pos=np.array([pos.to_tuple()]))
         else:
             self.highlight_pos = scene.Markers(
-                pos=np.array([[0, 0, 0]]),
+                pos=np.array([pos.to_tuple()]),
                 size=6,
                 face_color=ColorArray("#ff0000"),
                 parent=self._parent,
             )
+
+    def clear(self):
+        if self.line is not None:
+            self.line.clear()
+        if self.highlight_pos is not None:
+            self.highlight_pos.parent = None
+            self.highlight_pos = None
 
     def update(self, path: Path):
         pass

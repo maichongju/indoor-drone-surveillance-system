@@ -508,9 +508,36 @@ class PathDialog(QDialog):
                     self.path_list.setCurrentRow(self.path_list.count() - 1)
                     self._display_path(path)
 
-
     def _btn_remove_on_click(self, mode: _Mode):
-        pass
+        if mode == self._Mode.PATH:
+            if self.path_list.currentRow() == -1:
+                return
+            reply = QMessageBox.question(self, "Remove Path",
+                                         f"Are you sure you want to remove this path ({self.path_list.currentItem().path.name})?",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                current_index = self.path_list.currentRow()
+                self.path_list.paths.remove_path_by_index(current_index)
+                self.path_list.takeItem(current_index)
+                if self.path_list.count() != 0:
+                    if current_index == self.path_list.count():
+                        current_index -= 1
+                else:
+                    current_index = -1
+                self.path_list.setCurrentRow(current_index)
+                if current_index != -1:
+                    self._display_path(self.path_list.currentItem().path)
+                else:
+                    self._set_enable_path_detail(False)
+                    self.clear_canvas()
+                    self.path_detail.clear()
+                    self._path_detail_ui.setTitle("Path Detail")
+                    self._path_detail_ui.setEnabled(False)
+
+    def clear_canvas(self):
+        if self._canvas_path is not None:
+            self._canvas_path.clear()
+            self._canvas_path = None
 
     def _edit_location(self, item: LocationItem):
         dialog = LocationEditDialog(location=item.location, parent=self, show_name=False)

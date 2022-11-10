@@ -171,6 +171,9 @@ class PathList:
 
         return -1
 
+    def remove_path_by_index(self, index: int):
+        self._paths.pop(index)
+
     def name_exists(self, name: str) -> bool:
         for path in self._paths:
             if path.name == name:
