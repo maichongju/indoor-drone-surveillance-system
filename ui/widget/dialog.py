@@ -1,5 +1,6 @@
 from enum import Enum, IntEnum
 
+import numpy as np
 from PyQt6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QMessageBox,
                              QInputDialog)
@@ -9,7 +10,7 @@ from hub.drone import Drone
 from hub.location import LOCATIONS, Location
 from hub.path import PathList, Path
 from ui.icon import Icon
-from ui.widget.canvas import Canvas3DVispy
+from ui.widget.canvas import Canvas3DVispy, VispyPath
 from ui.widget.list import LocationItem, LocationListWidget, PathDetailsListWidget, PathListWidget
 from ui.widget.utils import StylePreset, set_label_style
 from ui.widget.widget import PositionLabelEditSetWidget
@@ -366,7 +367,7 @@ class PathDialog(QDialog):
         self._path_list = path_list
         self.current_path = None
         self._path_list_cur_index = -1
-        self._canvas_path = None
+        self._canvas_path : VispyPath | None = None
 
         self.setWindowTitle("Path")
         self._setup_ui()
@@ -444,7 +445,7 @@ class PathDialog(QDialog):
         gb_path_detail_layout.addWidget(self.path_detail)
         self.path_detail.setMaximumWidth(150)
         self.path_detail.itemDoubleClicked.connect(lambda item: self._edit_location(item))
-        self.path_detail.currentItemChanged.connect(lambda cur, _: self._path_location_on_change(cur))
+        self.path_detail.itemClicked.connect(lambda cur: self._highlight_pos(cur.location.position))
 
         path_detail_btn_layout = QVBoxLayout()
         gb_path_detail_layout.addLayout(path_detail_btn_layout)
@@ -497,10 +498,11 @@ class PathDialog(QDialog):
         self.path_detail.load(path)
         self._path_list_cur_index = self.path_list.currentRow()
         self._canvas_draw_path(path)
+        self._canvas_path.clear_highlight_pos()
 
     def _canvas_draw_path(self, path: Path):
         """
-        Helper function that will draw the path on the canvas.
+        Helper function that will draw the path on the canvas. this will also remove the highlight point.
         """
         self._canvas_path = self._canvas.plot_path(path, vispy_path=self._canvas_path)
 
@@ -533,11 +535,36 @@ class PathDialog(QDialog):
                 self._set_path_detail_is_updated(True)
                 self._update_path_detail_canvas()
 
+    def _highlight_pos(self, pos: Position):
+        print("highlight")
+        if self._canvas_path is not None:
+            self._canvas_path.set_highlight_pos(pos)
+
     def _update_path_detail_canvas(self):
         """
         Trigger a redrawn of the path on the canvas.
         """
-        pass
+        return
+        if self._canvas_path is None:
+            return # No path is currently displayed
+
+        active_pos= None
+        if self.path_detail.currentRow() != -1:
+            active_pos = self.path_detail.currentItem().location.position  # type: ignore
+
+        self._canvas_draw_path(self.path_detail.path)
+        canvas_path = self._canvas_path  # type: VispyPath
+        # Draw the active position
+        if active_pos is not None:
+
+            if canvas_path.highlight_pos is not None:
+                canvas_path.highlight_pos.set_data(pos= np.array(active_pos.to_tuple()))
+            else:
+                canvas_path.highlight_pos = self._canvas.plot_point(active_pos)
+        else:
+            if canvas_path.highlight_pos is not None:
+                canvas_path.highlight_pos.parent = None
+                canvas_path.highlight_pos = None
 
     def _set_path_detail_is_updated(self, is_updated: bool):
         self.path_detail.is_updated = is_updated
@@ -592,9 +619,6 @@ class PathDialog(QDialog):
             item.update()
             self.path_detail.is_updated = True
             self._path_detail_ui.setTitle(f"Path Detail - {self.path_detail.path.name} *")
-
-    def _path_location_on_change(self, location: Location):
-        pass
 
     def move_path_position(self, direction: str):
         if direction == "up":

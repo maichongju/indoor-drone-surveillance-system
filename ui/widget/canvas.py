@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from random import choice
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QHBoxLayout
@@ -15,6 +15,7 @@ from general.enum import Enum, auto
 from general.utils import ensure_folder_exist, Position
 from hub.path import Path
 from log.logger import LOGGER
+from .color import Color, VispyColor
 
 EXPORT_FOLDER = 'export'
 
@@ -226,6 +227,29 @@ class Canvas3D(FigureCanvas):
             f'3D plot saved to {EXPORT_FOLDER}/{source_file_name}_3d_{cur_time}.png')
 
 
+DEFAULT_LINE_SETTING = {
+    'width': 3,
+}
+
+DEFAULT_END_POINT_SETTING = {
+    'size': 5,
+}
+
+DEFAULT_MARKER_SETTING = {
+    'size': 5,
+}
+
+DEFAULT_TEXT_SETTING = {
+    'color': 'black',
+    'font_size': 10
+}
+
+DEFAULT_HIGH_LIGHT_SETTING = {
+    'face_color': VispyColor.get_color(Color.ORANGE),
+    'size': 10
+}
+
+
 class Canvas3DVispy(scene.SceneCanvas):
     TEXT_OFFSET = (0.1, 0.1, 0)
 
@@ -300,15 +324,31 @@ class Canvas3DVispy(scene.SceneCanvas):
             parent=self._view.scene,
         )
 
+    def plot_point(self, pos: Tuple[float, float, float]) -> scene.Markers:
+        """
+        Plot a single marker at the given position
+        """
+        return scene.visuals.Markers(
+            pos=np.array([pos]),
+            size=10,
+            face_color=ColorArray("#ED7014"),
+            parent=self._view.scene,
+        )
+
     def plot_line(self, points: List,
                   connect_head_tail: bool = False,
                   show_endpoint: bool = True,
                   show_endpoint_text: bool = True,
+                  line_settings: dict = None,
+                  text_settings: dict = None,
+                  endpoint_settings: dict = None,
+                  use_random_color: bool = True,
                   vline: VispyLine = None) -> VispyLine | None:
         """
         Draw the lines with the given points, lines are connected to each other in order. If line is given,
         then it will update the line instead creating a new one.
         Args:
+            use_random_color: whether to use random color for the line if no color is given
             vline: Vispy line to use for drawing
             points: 2D list containing the points
             connect_head_tail: connect the head and tail of the points
@@ -318,68 +358,97 @@ class Canvas3DVispy(scene.SceneCanvas):
         """
         if not isinstance(points, list):
             raise TypeError(f'points must be a list with format [[x1,y1,z1],[x2,y2,z2],...[xn,yn,zn]]')
+        if len(points) > 0 and not isinstance(points[0], (list, tuple)):
+            raise TypeError(f'points must be a list with format [[x1,y1,z1],[x2,y2,z2],...[xn,yn,zn]]')
+
+        # Process all the setting. If no setting is given, use the default setting
+        if line_settings is None:
+            line_settings = DEFAULT_LINE_SETTING.copy()
+        if text_settings is None:
+            text_settings = DEFAULT_TEXT_SETTING.copy()
+        if endpoint_settings is None:
+            endpoint_settings = DEFAULT_END_POINT_SETTING.copy()
+
+        if use_random_color and vline is None:
+            color = VispyColor.get_random_color()
+            if 'color' not in line_settings:
+                line_settings['color'] = color
+            if 'color' not in text_settings:
+                text_settings['color'] = color
+            if 'face_color' not in endpoint_settings:
+                endpoint_settings['face_color'] = color
 
         if len(points) == 0:
-            if vline is not None:
-                vline.clear()
-            return None
-
-        points = points.copy()
-        color = self.get_random_color()
-        if connect_head_tail:
-            points.append(points[0])
+            points = None
 
         if vline is None:
-            line = None
-            if len(points) != 0:
-                line = scene.visuals.Line(
-                    pos=np.array(points),
-                    color=color,
-                    width=3,
+            # no points yet, create a placeholder
+            if points is None:
+                line = scene.Line(
+                    pos=None,
                     parent=self._view.scene,
+                    **line_settings
                 )
-
-            # No need to draw the text for the last point
-            if connect_head_tail:
-                points.pop()
-
-            marker = scene.visuals.Markers(
-                pos=np.array(points),
-                size=10,
-                face_color=color,
-                parent=self._view.scene if show_endpoint else None,
-            )
-            line = VispyLine(line, marker)
-        else:
-            if vline.line is None:
-                vline.line = scene.visuals.Line(
+                endpoint = scene.Markers(
+                    pos=None,
+                    parent=self._view.scene if show_endpoint else None,
+                    **endpoint_settings
+                )
+                return VispyLine(
+                    line=line,
+                    endpoint=endpoint,
+                    line_settings=line_settings,
+                    endpoint_settings=endpoint_settings,
+                    text_settings=text_settings,
+                )
+            else:  # No vline create new vline
+                if connect_head_tail:
+                    points.append(points[0])
+                line = scene.Line(
                     pos=np.array(points),
-                    color=color,
-                    width=3,
                     parent=self._view.scene,
+                    **line_settings
                 )
+                if connect_head_tail:
+                    points.pop()
+                endpoint = scene.Markers(
+                    pos=np.array(points),
+                    parent=self._view.scene if show_endpoint else None,
+                    **endpoint_settings
+                )
+                vline = VispyLine(
+                    line=line,
+                    endpoint=endpoint,
+                    line_settings=line_settings,
+                    endpoint_settings=endpoint_settings,
+                    text_settings=text_settings,
+                )
+        else:  # vline is not None, update the original line
+            if points is None:  # No points, equal to clear the line
+                vline.clear()
+                return vline
             else:
-                vline.line.set_data(pos=np.array(points))
+                if connect_head_tail:
+                    points.append(points[0])
+                vline.line.set_data(pos=np.array(points), **line_settings)
+                if connect_head_tail:
+                    points.pop()
+                vline.endpoint.set_data(pos=np.array(points), **endpoint_settings)
+                vline.endpoint.parent = self._view.scene if show_endpoint else None
 
-            # No need to draw the text for the last point
-            if connect_head_tail:
-                points.pop()
-
-            vline.marker.set_data(pos=np.array(points))
-
-            vline.clear_text()
-
-        for point in points:
-            string = f'({point[0]:.2f},{point[1]:.2f},{point[2]:.2f})'
+        # update text
+        vline.clear_text()
+        for p in points:
+            string = f'({p[0]:.2f},{p[1]:.2f},{p[2]:.2f})'
             text = scene.visuals.Text(
-                text=string,
-                pos=self._get_text_pos(point),
-                color='black',
-                font_size=10,
+                string,
+                pos=self._get_text_pos(p),
                 parent=self._view.scene if show_endpoint_text else None,
+                **text_settings
             )
-            line.add_text(text) if vline is None else vline.add_text(text)
-        return line if vline is None else vline
+            vline.add_text(text)
+
+        return vline
 
     def _get_text_pos(self, point: tuple):
         return point[0] + self.TEXT_OFFSET[0], point[1] + self.TEXT_OFFSET[1], point[2] + self.TEXT_OFFSET[2]
@@ -397,7 +466,7 @@ class Canvas3DVispy(scene.SceneCanvas):
         points = path.pos_to_list()
         if vispy_path is None:
             line = self.plot_line(points, connect_head_tail=path.connected)
-            return VispyPath(line, path, parent = self._view.scene)
+            return VispyPath(line, path, parent=self._view.scene)
         else:
             vispy_path.line = self.plot_line(points, connect_head_tail=path.connected, vline=vispy_path.line)
             return vispy_path
@@ -416,20 +485,29 @@ class VispyLine:
     Helper class to draw save information for a line in vispy.
     """
 
-    def __init__(self, line: scene.Line, marker: scene.Markers = None, name: str = None):
+    def __init__(self, line: scene.Line,
+                 endpoint: scene.Markers,
+                 name: str = None,
+                 line_settings: dict = None,
+                 text_settings: dict = None,
+                 endpoint_settings: dict = None):
         self.parent = line.parent
         self.line = line
         self.text = []
-        self.marker = marker
+        self.endpoint = endpoint
         self.name = name
+        self.color = line.color
+        self.line_settings = line_settings
+        self.text_settings = text_settings
+        self.endpoint_settings = endpoint_settings
 
     def set_line_visible(self, visible: bool):
         if self.line is not None:
             self.line.parent = self.parent if visible else None
 
-    def set_marker_visible(self, visible: bool):
-        if self.marker is not None:
-            self.marker.parent = self.parent if visible else None
+    def set_endpoint_visible(self, visible: bool):
+        if self.endpoint is not None:
+            self.endpoint.parent = self.parent if visible else None
 
     def set_text_visible(self, visible: bool):
         for text in self.text:
@@ -444,11 +522,9 @@ class VispyLine:
         self.text.append(text)
 
     def clear(self):
-        self.line.parent = None
-        for t in self.text:  # type: scene.Text
-            t.parent = None
-        if self.marker is not None:
-            self.marker.parent = None
+        self.line.set_data(pos=None)
+        self.endpoint.set_data(pos=None)
+        self.clear_text()
 
 
 class VispyPath:
@@ -456,18 +532,23 @@ class VispyPath:
         self._parent = parent
         self.line = line
         self._path = path
-        self.highlight_pos = None
+        self.highlight_setting = DEFAULT_HIGH_LIGHT_SETTING.copy()
+        self.highlight_pos = scene.Markers(
+            pos=None,
+            parent=self._parent,
+            **self.highlight_setting,
+        )
 
     def set_highlight_pos(self, pos: Position):
-        if self.highlight_pos is not None:
-            self.highlight_pos.set_data(pos=np.array([pos.to_tuple()]))
-        else:
-            self.highlight_pos = scene.Markers(
-                pos=np.array([pos.to_tuple()]),
-                size=6,
-                face_color=ColorArray("#ff0000"),
-                parent=self._parent,
-            )
+        self.highlight_pos.set_data(
+            pos=np.array([pos.to_tuple()]),
+            **self.highlight_setting
+        )
+        self.highlight_pos.parent = self._parent
+
+    def clear_highlight_pos(self):
+        self.highlight_pos.set_data(pos=None)
+        self.highlight_pos.parent = None
 
     def clear(self):
         if self.line is not None:
