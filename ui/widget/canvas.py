@@ -363,11 +363,20 @@ class Canvas3DVispy(scene.SceneCanvas):
 
         # Process all the setting. If no setting is given, use the default setting
         if line_settings is None:
-            line_settings = DEFAULT_LINE_SETTING.copy()
+            if vline is None:
+                line_settings = DEFAULT_LINE_SETTING.copy()
+            else:
+                line_settings = vline.line_settings
         if text_settings is None:
-            text_settings = DEFAULT_TEXT_SETTING.copy()
+            if vline is None:
+                text_settings = DEFAULT_TEXT_SETTING.copy()
+            else:
+                text_settings = vline.text_settings
         if endpoint_settings is None:
-            endpoint_settings = DEFAULT_END_POINT_SETTING.copy()
+            if vline is None:
+                endpoint_settings = DEFAULT_END_POINT_SETTING.copy()
+            else:
+                endpoint_settings = vline.endpoint_settings
 
         if use_random_color and vline is None:
             color = VispyColor.get_random_color()
@@ -524,6 +533,7 @@ class VispyLine:
     def clear(self):
         self.line.set_data(pos=None)
         self.endpoint.set_data(pos=None)
+        self.endpoint.parent = None
         self.clear_text()
 
 

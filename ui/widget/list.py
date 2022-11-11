@@ -110,6 +110,7 @@ class PathDetailsListWidget(QListWidget):
     def __init__(self, path: Path = None, parent=None):
         super().__init__(parent=parent)
         self.path: Path | None = None
+        self.temp_path: Path | None = path.copy() if path is not None else None
         self.is_updated = False
         if path is not None:
             self.load(path)
@@ -120,7 +121,8 @@ class PathDetailsListWidget(QListWidget):
         """
         self.clear()
         self.path = path
-        for pos in self.path.positions:
+        self.temp_path = path.copy()
+        for pos in self.temp_path.positions:
             location = Location(pos)
             item = LocationItem(location)
             super().addItem(item)
@@ -135,26 +137,46 @@ class PathDetailsListWidget(QListWidget):
         location = Location(position)
         item = LocationItem(location)
         super().addItem(item)
-        self.path.add_position(position)
+        self.temp_path.add_position(position)
+
+    def move_current_up(self):
+        """Move the current item up."""
+        current_row = self.currentRow()
+
+        # if nothing selected or already at the top
+        if current_row == -1 or current_row == 0:
+            return
+
+    def swap_item(self, row1: int, row2: int):
+        """Swap the two items at the given rows."""
+
+        item1 = self.item(row1)
+        item2 = self.item(row2)
+        temp_item = item1.location
+        item1.location = item2.location
+        item2.location = temp_item
+        item1.update()
+        item2.update()
+        self.temp_path.swap(row1, row2)
 
     def insertItem(self, row: int, position: Position) -> None:
         location = Location(position)
         item = LocationItem(location)
         super().insertItem(row, item)
-        self.path.insert_position(row, position)
+        self.temp_path.insert_position(row, position)
 
     def takeItem(self, row: int) -> QListWidgetItem:
         item = super().takeItem(row)
-        self.path.positions.pop(row)
+        self.temp_path.positions.pop(row)
         return item
 
     def remove(self, index: int):
         """Remove the item at the given index."""
         item = super().takeItem(index)
         if item is not None:
-            self.path.positions.pop(index)
+            self.temp_path.positions.pop(index)
 
-    def update_positions(self):
+    def apply_change(self):
         """
         This will replace all the positions in the path with the positions in the list
         """
@@ -168,3 +190,9 @@ class PathDetailsListWidget(QListWidget):
             pos.append(item.location.position)
         self.path.replace_pos_all(pos)
         self.is_updated = False
+
+    def update_pos_at_index(self, index: int, pos: Position):
+        self.temp_path.positions[index] = pos
+        self.item(index).location.position = pos
+        self.item(index).update()
+        self.is_updated = True

@@ -1,6 +1,5 @@
 from enum import Enum, IntEnum
 
-import numpy as np
 from PyQt6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QVBoxLayout, QGroupBox, QMessageBox,
                              QInputDialog)
@@ -367,7 +366,7 @@ class PathDialog(QDialog):
         self._path_list = path_list
         self.current_path = None
         self._path_list_cur_index = -1
-        self._canvas_path : VispyPath | None = None
+        self._canvas_path: VispyPath | None = None
 
         self.setWindowTitle("Path")
         self._setup_ui()
@@ -536,7 +535,6 @@ class PathDialog(QDialog):
                 self._update_path_detail_canvas()
 
     def _highlight_pos(self, pos: Position):
-        print("highlight")
         if self._canvas_path is not None:
             self._canvas_path.set_highlight_pos(pos)
 
@@ -544,27 +542,22 @@ class PathDialog(QDialog):
         """
         Trigger a redrawn of the path on the canvas.
         """
-        return
         if self._canvas_path is None:
-            return # No path is currently displayed
+            return  # No path is currently displayed
 
-        active_pos= None
+        active_pos = None
         if self.path_detail.currentRow() != -1:
             active_pos = self.path_detail.currentItem().location.position  # type: ignore
+        else:  # No active position
+            self._canvas_path.clear_highlight_pos()
 
-        self._canvas_draw_path(self.path_detail.path)
-        canvas_path = self._canvas_path  # type: VispyPath
+        self._canvas_draw_path(self.path_detail.temp_path)
+
         # Draw the active position
         if active_pos is not None:
-
-            if canvas_path.highlight_pos is not None:
-                canvas_path.highlight_pos.set_data(pos= np.array(active_pos.to_tuple()))
-            else:
-                canvas_path.highlight_pos = self._canvas.plot_point(active_pos)
+            self._canvas_path.set_highlight_pos(active_pos)
         else:
-            if canvas_path.highlight_pos is not None:
-                canvas_path.highlight_pos.parent = None
-                canvas_path.highlight_pos = None
+            self._canvas_path.clear_highlight_pos()
 
     def _set_path_detail_is_updated(self, is_updated: bool):
         self.path_detail.is_updated = is_updated
@@ -604,7 +597,7 @@ class PathDialog(QDialog):
                 return
             current_index = self.path_detail.currentRow()
             self.path_detail.takeItem(current_index)
-
+            self._update_path_detail_canvas()
             self._set_path_detail_is_updated(True)
 
     def clear_canvas(self):
@@ -615,21 +608,30 @@ class PathDialog(QDialog):
     def _edit_location(self, item: LocationItem):
         dialog = LocationEditDialog(location=item.location, parent=self, show_name=False)
         if dialog.exec():
-            item.location = dialog.location
-            item.update()
-            self.path_detail.is_updated = True
+            self.path_detail.update_pos_at_index(self.path_detail.currentRow(), dialog.location.position)
             self._path_detail_ui.setTitle(f"Path Detail - {self.path_detail.path.name} *")
+            self._update_path_detail_canvas()
 
     def move_path_position(self, direction: str):
         if direction == "up":
-            pass
+            if self.path_detail.currentRow() == -1 or self.path_detail.currentRow() == 0:
+                return
+            current_index = self.path_detail.currentRow()
+            self.path_detail.swap_item(current_index, current_index - 1)
+            self.path_detail.setCurrentRow(current_index - 1)
         elif direction == "down":
-            pass
+            if self.path_detail.currentRow() == -1 or self.path_detail.currentRow() == self.path_detail.count() - 1:
+                return
+            current_index = self.path_detail.currentRow()
+            self.path_detail.swap_item(current_index, current_index + 1)
+            self.path_detail.setCurrentRow(current_index + 1)
+
+        self._set_path_detail_is_updated(True)
+        self._update_path_detail_canvas()
 
     def _btn_save_path_detail_on_click(self):
-        self.path_detail.update_positions()
-        self._path_detail_ui.setTitle(f"Path Detail - {self.path_detail.path.name}")
-        self.path_detail.is_updated = False
+        self.path_detail.apply_change()
+        self._set_path_detail_is_updated(False)
 
     def _btn_save_onclick(self):
         try:

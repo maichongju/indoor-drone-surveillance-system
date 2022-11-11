@@ -56,6 +56,22 @@ class Path:
         for p in pos:
             self.add_position(p.copy())
 
+    def swap(self, index1: int, index2: int):
+        """
+        Swap the position at the given index
+        Args:
+            index1: index of the first position
+            index2: index of the second position
+        """
+        self._positions[index1], self._positions[index2] = self._positions[index2], self._positions[index1]
+
+    def copy(self):
+        """
+        Create a deepcopy of the path
+        """
+        pos = [p.copy() for p in self._positions]
+        return Path(self.name, pos, self.connected)
+
     def is_empty(self) -> bool:
         return len(self._positions) == 0
 
