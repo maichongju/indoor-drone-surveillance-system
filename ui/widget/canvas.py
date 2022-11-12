@@ -324,16 +324,39 @@ class Canvas3DVispy(scene.SceneCanvas):
             parent=self._view.scene,
         )
 
-    def plot_point(self, pos: Tuple[float, float, float]) -> scene.Markers:
+    def plot_point(self,
+                   pos: Tuple[float, float, float],
+                   setting: dict = None,
+                   vmarker: VispyMarker = None,
+                   use_random_color: bool = True
+                   ) -> VispyMarker:
+
         """
         Plot a single marker at the given position
         """
-        return scene.visuals.Markers(
-            pos=np.array([pos]),
-            size=10,
-            face_color=ColorArray("#ED7014"),
-            parent=self._view.scene,
-        )
+
+        if setting is None:
+            if vmarker is None:
+                setting = DEFAULT_MARKER_SETTING.copy()
+            else:
+                setting = vmarker.setting
+
+        if 'face_color' not in setting:
+            setting['face_color'] = VispyColor.get_random_color()
+
+        # Need a new marker
+        if vmarker is None:
+            marker = scene.visuals.Markers(
+                pos=np.array([pos]),
+                parent=self._view.scene,
+                **setting
+            )
+            vmarker = VispyMarker(marker, setting=setting)
+        else:
+            vmarker.marker.set_data(pos=np.array([pos]), **setting)
+            vmarker.setting = setting
+
+        return vmarker
 
     def plot_line(self, points: List,
                   connect_head_tail: bool = False,
@@ -569,3 +592,19 @@ class VispyPath:
 
     def update(self, path: Path):
         pass
+
+
+class VispyMarker:
+    def __init__(self, marker: scene.Markers, name: str = None, setting: dict = None):
+        self.parent = marker.parent
+        self.marker = marker
+        self.name = name
+        self.setting = setting
+
+    def set_marker_visible(self, visible: bool):
+        if self.marker is not None:
+            self.marker.parent = self.parent if visible else None
+
+    def clear(self):
+        self.marker.set_data(pos=None)
+        self.marker.parent = None
