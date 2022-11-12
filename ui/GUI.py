@@ -17,15 +17,16 @@ from hub.hub import Hub
 from hub.location import LOCATIONS
 from hub.path import PathList
 from log.logger import LOGGER
-from ui.widget.debugwindow import DebugWindow
 from ui.widget.dialog import LocationDialog, PathDialog
-from ui.widget.flightdatawindow import FlightDataWindow
 from ui.widget.tab.dronetab import DroneWidget
 from ui.widget.tab.monitortab import MonitorTab
 from ui.widget.tunepid import TunePID
+from ui.widget.window.debugwindow import DebugWindow
+from ui.widget.window.flightdatawindow import FlightDataWindow
 
 PATH_FILE_PATH = "paths.json"
 PATH_FILE_DEFAULT = []
+
 
 class GUI(QApplication):
     def __init__(self, hub: Hub, config: Config, start_check=True):

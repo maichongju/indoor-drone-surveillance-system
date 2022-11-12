@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QVBoxLayout
 from PyQt6.QtWidgets import QWidget
 
 from hub.hub import Hub
-from .tab.debugtab import DebugTab
+from ui.widget.tab.debugtab import DebugTab
 
 
 class DebugWindow(QWidget):
