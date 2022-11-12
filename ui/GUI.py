@@ -23,6 +23,7 @@ from ui.widget.tab.monitortab import MonitorTab
 from ui.widget.tunepid import TunePID
 from ui.widget.window.debugwindow import DebugWindow
 from ui.widget.window.flightdatawindow import FlightDataWindow
+from ui.widget.window.realtimemapwindow import RealTimeMapWindow
 
 PATH_FILE_PATH = "paths.json"
 PATH_FILE_DEFAULT = []
@@ -64,6 +65,7 @@ class MainWindow(QMainWindow):
         self._config = config
         self._hub = hub
         self._debug_window = DebugWindow(self._hub)
+        self._real_time_window = None
         self._setup_ui()
         self._setup_menu()
 
@@ -153,6 +155,10 @@ class MainWindow(QMainWindow):
         flight_data_plot_action.triggered.connect(self._show_flight_data_plot)
         tool_menu.addAction(flight_data_plot_action)
 
+        real_time_map_action = QAction('&Real Time Map', tool_menu)
+        real_time_map_action.triggered.connect(self._show_real_time_map)
+        tool_menu.addAction(real_time_map_action)
+
         debug_menu = menu_bar.addMenu('&Debug')
         # drone_menu = debug_menu.addMenu('&Drone')
         # for drone in self._hub.drones.values():
@@ -205,6 +211,14 @@ class MainWindow(QMainWindow):
     def _show_flight_data_plot(self):
         self._window = FlightDataWindow()
         self._window.show()
+
+    def _show_real_time_map(self):
+        self._real_time_window = RealTimeMapWindow(self._hub,
+                                                   close_callback=self._read_time_map_cb)
+        self._real_time_window.show()
+
+    def _read_time_map_cb(self):
+        self.__real_time_window = None
 
     def _tab_changed(self):
         for i in range(self.tab.count()):
