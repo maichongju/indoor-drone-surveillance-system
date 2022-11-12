@@ -371,6 +371,9 @@ class Canvas3DVispy(scene.SceneCanvas):
         Draw the lines with the given points, lines are connected to each other in order. If line is given,
         then it will update the line instead creating a new one.
         Args:
+            endpoint_settings: new endpoint settings if given
+            text_settings: new text settings if given
+            line_settings: new line settings if given
             use_random_color: whether to use random color for the line if no color is given
             vline: Vispy line to use for drawing
             points: 2D list containing the points
@@ -467,6 +470,9 @@ class Canvas3DVispy(scene.SceneCanvas):
                     points.pop()
                 vline.endpoint.set_data(pos=np.array(points), **endpoint_settings)
                 vline.endpoint.parent = self._view.scene if show_endpoint else None
+                vline.text_settings = text_settings
+                vline.line_settings = line_settings
+                vline.endpoint_settings = endpoint_settings
 
         # update text
         vline.clear_text()
