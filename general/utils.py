@@ -517,3 +517,11 @@ def df_to_list(df: DataFrame, col_names: List) -> List:
         result.append(df[col_name].tolist())
 
     return result
+
+
+def update_dict(origin_dict: dict, new_dict: dict):
+    """
+    Update the source dict with the target dict
+    """
+    for key, value in new_dict.items():
+        origin_dict[key] = value

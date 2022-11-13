@@ -12,7 +12,7 @@ from vispy import scene
 from vispy.color import ColorArray
 
 from general.enum import Enum, auto
-from general.utils import ensure_folder_exist, Position
+from general.utils import ensure_folder_exist, Position, update_dict
 from hub.path import Path
 from log.logger import LOGGER
 from .color import Color, VispyColor
@@ -335,11 +335,16 @@ class Canvas3DVispy(scene.SceneCanvas):
         Plot a single marker at the given position
         """
 
+        if vmarker is None:
+            temp_setting = DEFAULT_MARKER_SETTING.copy()
+        else:
+            temp_setting = vmarker.setting
+
         if setting is None:
-            if vmarker is None:
-                setting = DEFAULT_MARKER_SETTING.copy()
-            else:
-                setting = vmarker.setting
+            setting = temp_setting
+        else:
+            update_dict(temp_setting, setting)
+            setting = temp_setting
 
         if 'face_color' not in setting:
             setting['face_color'] = VispyColor.get_random_color()
