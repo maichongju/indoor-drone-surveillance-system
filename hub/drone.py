@@ -930,16 +930,16 @@ class FlyControl:
 
         self._control_thread.add_command(action)
 
-    def go_to(self, position: Position):
+    def go_to(self, command: Position | Path):
         if not self.is_flying:
             LOGGER.debug(f'[Fly Control] {self._drone.name} is not flying')
             return
-        if not position or not isinstance(position, Position):
+        if not command or not isinstance(command, (Position, Path)):
             Logger.warning(
                 f'[Fly Control] {self._drone.name} invalid position')
             return
-        LOGGER.drone(f'Going to {position}')
-        self._control_thread.add_command(position)
+        LOGGER.drone(f'Going to {command}')
+        self._control_thread.add_command(command)
 
     def move_distance(self, distance_x: float, distance_y: float, distance_z: float, velocity: float = None):
         """Move the drone in x, y, z direction for the given distance. (From `motion_commander`). This will block 
