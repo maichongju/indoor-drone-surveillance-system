@@ -608,6 +608,6 @@ class PathEditWidget(QWidget):
         self._set_path_detail_is_updated(False)
 
     def get_current_path(self) -> Path | None:
-        if self.path_list.currentRow() == 0:
+        if self.path_list.currentRow() == -1:
             return None
         return self.path_list.currentItem().path
