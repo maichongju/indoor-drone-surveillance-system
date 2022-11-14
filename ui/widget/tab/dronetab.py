@@ -2,15 +2,15 @@ import sys
 from enum import Enum
 from threading import Thread
 
-from general.utils import Position
-from hub.drone import Drone, DroneException, FlyCommandManually, FlyStatus
-from log import DroneInfo, get_battery_state_name, get_loco_mode_name
-from log.logger import LOGGER
 from PyQt6.QtCore import (QObject, QRunnable, Qt, QThreadPool, pyqtSignal,
                           pyqtSlot)
 from PyQt6.QtWidgets import (QCheckBox, QDialog, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QMessageBox, QProgressBar,
                              QPushButton, QVBoxLayout, QWidget)
+
+from hub.drone import Drone, DroneException, FlyCommandManually, FlyStatus
+from log import DroneInfo, get_battery_state_name, get_loco_mode_name
+from log.logger import LOGGER
 from ui.icon import Icon
 from ui.widget.dialog import GoToDialog
 from ui.widget.tab.tab import Tab
@@ -667,7 +667,7 @@ class DroneWidget(Tab):
         self.btn_rotate_left.setEnabled(enable)
         self.btn_rotate_right.setEnabled(enable)
 
-        self.btn_goto.setEnabled(enable)
+        # self.btn_goto.setEnabled(enable)
         self.btn_stop.setEnabled(enable)
 
     def _btn_suc_connect(self):
@@ -751,9 +751,8 @@ class DroneWidget(Tab):
         dialog = GoToDialog(self._drone, parent=self)
         value = dialog.exec()
         if value == QDialog.DialogCode.Accepted:
-            desc = Position(dialog.position.x, dialog.position.y,
-                            self._drone.state.position.z)
-            self._drone.fly_control.go_to(desc)
+            command = dialog.result
+            self._drone.fly_control.go_to(command)
 
     def _stop_btn_on_click(self):
         """Stop button on click function call

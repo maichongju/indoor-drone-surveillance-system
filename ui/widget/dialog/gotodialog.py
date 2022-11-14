@@ -1,13 +1,18 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QLineEdit, QWidget
+from PyQt6.QtCore import QSize
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QHBoxLayout, QPushButton, QLineEdit, QWidget, QTabWidget, \
+    QMessageBox
 
+import setting
 from general.enum import Enum
 from general.utils import Axis, Position
 from hub.drone import Drone
 from hub.location import Location, LOCATIONS
+from hub.path import PathList, Path
+from log.logger import LOGGER
 from ui.icon import Icon
 from ui.widget.dialog.locationeditdialog import LocationEditDialog
 from ui.widget.list import LocationListWidget, LocationItem
-from ui.widget.utils import set_label_style, StylePreset
+from ui.widget.widget import PathEditWidget
 
 
 class _Icon(Enum):
@@ -18,18 +23,56 @@ class GoToDialog(QDialog):
     """Dialog for go to a location.
     """
 
+    class Mode(Enum):
+        POSITION = 0
+        PATH = 1
+
     def __init__(self, drone: Drone, parent=None):
         super().__init__(parent)
         self._drone = drone
         self.setWindowTitle("Go to location")
         self.position = None
         self._setup_ui()
-        self.setFixedSize(self.sizeHint())
+        self.resize(self._get_tab_size(add_height=50))
+        self.mode = self.Mode.POSITION
+        self.result: Path | Location | None = None
 
     def _setup_ui(self):
-
         layout = QVBoxLayout()
         self.setLayout(layout)
+
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+
+        self._path_widget = self._get_path_tab()
+
+        # tabs.addTab(self._get_position_tab(), "Position")
+        self.tabs.addTab(self._get_position_tab(), "Position")
+        self.tabs.addTab(self._path_widget, "Path")
+
+        self.tabs.currentChanged.connect(lambda index: self.tab_change_cb(index))
+
+        self.bottom_layout = QHBoxLayout()
+        layout.addLayout(self.bottom_layout)
+
+        self.bottom_layout.addStretch()
+
+        self.btn_start = QPushButton("Start")
+        self.btn_start.clicked.connect(self.accept)
+        self.bottom_layout.addWidget(self.btn_start)
+
+        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.clicked.connect(self.reject)
+        self.bottom_layout.addWidget(self.btn_cancel)
+
+        self.btn_save = QPushButton("Save")
+        self.btn_save.clicked.connect(self.save)
+        self.bottom_layout.addWidget(self.btn_save)
+
+    def _get_position_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout()
+        widget.setLayout(layout)
 
         center_layout = QHBoxLayout()
         layout.addLayout(center_layout)
@@ -60,10 +103,6 @@ class GoToDialog(QDialog):
         self.btn_add_to_list.clicked.connect(self._add_btn_click_callback)
         cord_layout.addWidget(self.btn_add_to_list)
 
-        self.lbl_error = QLabel()
-        set_label_style(self.lbl_error, StylePreset.WARNING_TEXT)
-        cord_layout.addWidget(self.lbl_error)
-
         cord_layout.addStretch()
 
         # Layout for location list
@@ -76,18 +115,18 @@ class GoToDialog(QDialog):
         self.location_list.setFixedSize(120, 150)
         self.location_list.itemDoubleClicked.connect(self._list_double_click_callback)
 
-        btn_layout = QHBoxLayout()
-        layout.addLayout(btn_layout)
+        return widget
 
-        btn_layout.addStretch()
+    def _get_path_tab(self):
+        """"""
+        self.path_list = PathList()
+        try:
+            with open(setting.PATH_PATH, "r") as f:
+                self.path_list = PathList.load(f)
+        except Exception as e:
+            LOGGER.warning(f"Failed to load path list: {e}")
 
-        self.btn_ok = QPushButton("Go")
-        self.btn_ok.clicked.connect(self.accept)
-        btn_layout.addWidget(self.btn_ok)
-
-        self.btn_cancel = QPushButton("Cancel")
-        self.btn_cancel.clicked.connect(self.reject)
-        btn_layout.addWidget(self.btn_cancel)
+        return PathEditWidget(self.path_list)
 
     def _list_double_click_callback(self, item: LocationItem):
         """Callback function for double click item
@@ -114,7 +153,7 @@ class GoToDialog(QDialog):
                 self.pos_z.le.setText(str(self._drone.state.position.z))
 
     def _add_btn_click_callback(self):
-        if (self._validate_input()):
+        if self._validate_input():
             pos = Position(
                 float(self.pos_x.le.text()),
                 float(self.pos_y.le.text()),
@@ -140,17 +179,62 @@ class GoToDialog(QDialog):
         except ValueError:
             return False
 
+    def reject(self) -> None:
+        super().reject()
+
     def accept(self):
-        if self._validate_input():
-            self.position = Position(
-                float(self.pos_x.le.text()),
-                float(self.pos_y.le.text()),
-                float(self.pos_z.le.text())
-            )
-            LOCATIONS.save(new_location=self.location_list.locations)
-            super().accept()
-        else:
-            self.lbl_error.setText("Invalid X or Y or Z position")
+        if self.mode == self.Mode.POSITION:
+            if self._validate_input():
+                self.result = Position(
+                    float(self.pos_x.le.text()),
+                    float(self.pos_y.le.text()),
+                    float(self.pos_z.le.text())
+                )
+            else:
+                QMessageBox.warning(self, "Invalid input", "Invalid x, y, z position")
+                return
+        elif self.mode == self.Mode.PATH:
+            cur_path = self._path_widget.get_current_path()
+            if cur_path is None:
+                QMessageBox.warning(self, "Invalid input", "No path selected")
+                return
+            self.result = cur_path
+
+        super().accept()
+
+    def save(self):
+        index = self.tabs.currentIndex()
+        if index == 0:
+            if self._validate_input():
+                self.position = Position(
+                    float(self.pos_x.le.text()),
+                    float(self.pos_y.le.text()),
+                    float(self.pos_z.le.text())
+                )
+                LOCATIONS.save(new_location=self.location_list.locations)
+                QMessageBox.information(self, "Success", "Location saved")
+            else:
+                QMessageBox.warning(self, "Invalid input", "Invalid x, y, z position")
+        elif index == 1:
+            try:
+                with open(setting.PATH_PATH, "w") as f:
+                    self.path_list.save(f)
+                    QMessageBox.information(self, "Success", "Path saved")
+            except Exception as e:
+                QMessageBox.warning(self, "Failed to save path", f"Save Failed")
+                LOGGER.debug(f"Failed to save path: {e}")
+
+    def _get_tab_size(self, add_width: int = 0, add_height: int = 0) -> QSize:
+        """Get the current tab size"""
+        index = self.tabs.currentIndex()
+        size: QSize = self.tabs.widget(index).sizeHint()
+        size.setHeight(size.height() + add_height)
+        size.setWidth(size.width() + add_width)
+        return size
+
+    def tab_change_cb(self, index):
+        self.resize(self._get_tab_size(add_height=50))
+        self.mode = self.Mode.POSITION if index == 0 else self.Mode.PATH
 
 
 class PositionLabelEditSetWidget(QWidget):
