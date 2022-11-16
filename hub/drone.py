@@ -1186,7 +1186,9 @@ class FlyControlThread(Thread):
 
         if SINGLETON.Config.get_value(ConfigKey.ROOT_DUMP_FLIGHT_DATA):
             self._dump_flight_data_file = get_dump_flight_data_file(
-                self._drone.state)
+                state=self._drone.state,
+                uri=self._drone.uri)
+
             LOGGER.debug('Dump flight data to ' +
                          self._dump_flight_data_file.name)
 
