@@ -1764,11 +1764,14 @@ class FlyControlThread(Thread):
                 if next_position is not None:
                     self._go_to_helper.reset()
                     self._go_to_helper.target_position = next_position
+                    LOGGER.debug(f"reach target, going to next position: {next_position}")
+                    return motion
 
                 # path is empty now. Clear it
                 self._path = None
             self.setting.fly_mode.set(FlyMode.HOVER)
             self._go_to_helper.reset()
+            LOGGER.debug(f"reach position at {current_pos}, changed to hover mode")
             return motion
 
         # Correct yaw if not facing the direction
@@ -1852,6 +1855,7 @@ class FlyControlThread(Thread):
             # Obstacle detected need to change direction
             if self._drone_state.front_distance < turn_trigger_distance.x:
                 self._go_to_helper.action = GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE
+                LOGGER.debug(f"Obstacle detected, change direction (front:{self._drone_state.front_distance})")
                 return motion
             slow_dist: float = self.setting.distance.auto_slow_distance.get()
             if not self._go_to_helper.avoiding_obstacle:  # Normal move
@@ -1871,18 +1875,22 @@ class FlyControlThread(Thread):
                         max_value=slow_dist,
                         min_value=0)
 
-                if thrust_percent == 0 or self._is_pass_target(
+                    self._extra_log = f" To Y. dist_to_target.y: {dist_to_target.y}"
+
+                if thrust_percent < 0.1 or self._is_pass_target(
                         self._go_to_helper.moving_direction, self._drone_state.position,
                         self._go_to_helper.target_position):
                     # starting approaching the target. Use the hold mode
                     hover_pos = get_projection_point(self._maintain_direction, self._drone_state.position)
                     self._change_to_hold(hover_pos,
                                          GoToAction.REQUIRE_AXIS_CHANGE)
+                    LOGGER.debug(f'Reach current axis. Change to hold. (hover_pos: {hover_pos})')
 
                 else:
                     thrust_percent = thrust_percent * 2
                     vx = velocity.vy * thrust_percent
                     motion.vx = vx
+                    self._extra_log += f" thrust_percent: {thrust_percent}, vx: {vx}"
             else:  # avoiding the obstacle
                 monitor_dist = self._drone_state.left_distance if self._go_to_helper.obstacle_direction == Direction.NEGATIVE \
                     else self._drone_state.right_distance
