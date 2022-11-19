@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QGridLayout,
 from general.utils import AxisDirection
 from hub.drone import Drone, FlyControlMode, FlyMode, Motion, Position, DronePowerAction
 from hub.path import Path
+from ui.widget.dialog.locationeditdialog import LocationEditDialog
 from ui.widget.tab.tab import Tab
 
 
@@ -107,9 +108,15 @@ class DebugTab(Tab):
         row += 1
 
         main_layout.addWidget(QLabel("Hover Position"), row, 0)
+        layout = QHBoxLayout()
         self.lb_hover_position = QLabel(str(self._setting.hover_position.get(
         ) if self._setting.hover_position.get() else "None"))
-        main_layout.addWidget(self.lb_hover_position, row, 1)
+        self.btn_set_hover_position = QPushButton("Set")
+        self.btn_set_hover_position.clicked.connect(
+            self._set_hover_position_on_click)
+        layout.addWidget(self.lb_hover_position)
+        layout.addWidget(self.btn_set_hover_position)
+        main_layout.addLayout(layout, row, 1)
         row += 1
 
         main_layout.addWidget(QLabel("Axis Alignment"), row, 0)
@@ -268,3 +275,8 @@ class DebugTab(Tab):
 
     def _power_action_on_click(self, state: DronePowerAction):
         self._drone.perform_power_action(state)
+
+    def _set_hover_position_on_click(self):
+        dialog = LocationEditDialog(show_name=False, mode=LocationEditDialog.Mode.ADD)
+        if dialog.exec():
+            self._setting.hover_position.set(dialog.location.position)
