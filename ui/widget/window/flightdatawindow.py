@@ -8,7 +8,7 @@ from ui.widget.tab.threedplottab import ThreeDPlotVispyTab
 from ui.widget.tab.twodplottab import TwoDPlotTab
 
 # Must import this before importing matplotlib
-from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QFileDialog, QTabWidget
+from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QFileDialog, QTabWidget, QMessageBox
 
 import pandas as pd
 
@@ -50,19 +50,24 @@ class FlightDataWindow(QWidget):
         tab.addTab(self.tab_2d, self.tab_2d.name)
 
     def _load_btn_on_click(self):
-        # Add file dialog (use QFileDialog)
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "CSV Files (*.csv)")
-        file_name = file_path.split('/')[-1]
-        if file_path == '':
-            return
-            # file_path = 'logs/flightdataexample.csv'
-        df = pd.read_csv(file_path)
+        try:
+            # Add file dialog (use QFileDialog)
+            file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "CSV Files (*.csv)")
+            file_name = file_path.split('/')[-1]
+            if file_path == '':
+                return
+                # file_path = 'logs/flightdataexample.csv'
+            df = pd.read_csv(file_path)
 
-        df['hover.x'] = df['hover.x'].replace({'None': None}).astype(float)
-        df['hover.y'] = df['hover.y'].replace({'None': None}).astype(float)
-        df['hover.z'] = df['hover.z'].replace({'None': None}).astype(float)
-        self.tab_3d.plot(df, file_name)
-        self.tab_2d.plot(df, file_name)
+            df['hover.x'] = df['hover.x'].replace({'None': None}).astype(float)
+            df['hover.y'] = df['hover.y'].replace({'None': None}).astype(float)
+            df['hover.z'] = df['hover.z'].replace({'None': None}).astype(float)
+            self.tab_3d.plot(df, file_name)
+            self.tab_2d.plot(df, file_name)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error when loading file ({e})")
+            self.tab_2d.clear()
+            self.tab_3d.clear()
 
     def _clear_btn_on_click(self):
         self.tab_3d.clear()
