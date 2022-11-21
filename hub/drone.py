@@ -684,7 +684,7 @@ class FlyControlVelocity:
     # type Motion
     # max speed for each direction when in auto mode
     auto_velocity: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Motion(0.15, 0.15, 0.05, 360 / 20)))
+        default_factory=lambda: VariableCallback(Motion(0.075, 0.075, 0.1, 360 / 20)))
 
     # type Motion
     # auto avoidance speed
@@ -693,6 +693,9 @@ class FlyControlVelocity:
 
     # type Motion
     hover_correction_velocity: VariableCallback = field(
+        default_factory=lambda: VariableCallback(Motion(0.05, 0.05, 0.05, 0)))
+
+    hold_correction_velocity: VariableCallback = field(
         default_factory=lambda: VariableCallback(Motion(0.1, 0.1, 0.05, 0)))
 
     # type Motion
@@ -702,7 +705,7 @@ class FlyControlVelocity:
 
     # type float
     take_off_velocity: VariableCallback = field(
-        default_factory=lambda: VariableCallback(0.15))
+        default_factory=lambda: VariableCallback(0.2))
 
     # type float
     land_velocity: VariableCallback = field(
@@ -722,10 +725,19 @@ class FlyControlDistance:
     hover_correction_max_distance: VariableCallback = field(
         default_factory=lambda: VariableCallback(Position(0.1, 0.1, 0.05)))
 
+    # Distance for go to hold. More distance
+    # type Position
+    hold_correction_min_distance: VariableCallback = field(
+        default_factory=lambda: VariableCallback(Position(0.15, 0.15, 0.1)))
+
+    # type Position
+    hold_correction_max_distance: VariableCallback = field(
+        default_factory=lambda: VariableCallback(Position(0.3, 0.3, 0.05)))
+
     # type Position
     # Distance for auto avoidance to trigger
     auto_avoidance_trigger_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Position(0.25, 0.25, 0.2)))
+        default_factory=lambda: VariableCallback(Position(0.4, 0.4, 0.2)))
 
     # type Position
     # This is the drone dimension. Absolute need to avoid
@@ -735,11 +747,11 @@ class FlyControlDistance:
     # type Position
     # Distance for auto moving to turn. (Should be grater than auto_avoidance_trigger_distance)
     auto_turn_trigger_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Position(0.4, 0.4, 0.10)))
+        default_factory=lambda: VariableCallback(Position(0.5, 0.5, 0.10)))
 
     # type float
     auto_slow_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(0.3))
+        default_factory=lambda: VariableCallback(0.4))
 
     # type float
     # Distance for yaw correction
@@ -848,7 +860,7 @@ class FlyControl:
         self._drone = drone
         self._control_thread = None
         self.setting = FlyControlSetting()
-        self.setting.fly_mode.callbacks.add_callback(self._set_fly_mode)
+        self.setting.fly_mode.callbacks.add_callback(self._set_fly_mode_cb)
         self._control_mode = FlyControlMode.MANUALLY
         self.fly_status = FlyStatus.LANDED
 
@@ -989,7 +1001,7 @@ class FlyControl:
             LOGGER.debug(f'[Fly Control] {self._drone.name} invalid motion')
         self._control_thread.add_command(motion)
 
-    def _set_fly_mode(self, mode: FlyMode):
+    def _set_fly_mode_cb(self, mode: FlyMode):
         """Set the fly mode of the drone.
         """
         if self._control_thread is None:
@@ -1184,6 +1196,9 @@ class FlyControlThread(Thread):
         self._land_time_out = 0
         self._land_timer = 0
 
+        # a dictionary to store the position buffer.
+        self._position_buffer_dict = {}
+
         if SINGLETON.Config.get_value(ConfigKey.ROOT_DUMP_FLIGHT_DATA):
             self._dump_flight_data_file = get_dump_flight_data_file(
                 state=self._drone.state,
@@ -1241,16 +1256,14 @@ class FlyControlThread(Thread):
                             f'[Fly Control] {self._drone.name} is not in debug mode')
                     else:
                         self._current_command = command
-                        self.set_hover(True)
+                        self.setting.fly_mode.set(FlyMode.HOVER)
 
                 if self.fly_status == FlyStatus.TAKING_OFF:
                     self._extra_log = 'Taking Off'
                     current_position = self._drone_state.position
                     if current_position.z < self.setting.distance.take_off_height.get():
-                        motion = self.get_hover_velocity(
-
-                            current_position, self.hover_position,
-                            override_z=self.setting.velocity.take_off_velocity.get())
+                        motion = self.get_hover_velocity(self.hover_position,
+                                                         override_z=self.setting.velocity.take_off_velocity.get())
 
                     else:
                         self.fly_status = FlyStatus.FLYING
@@ -1270,8 +1283,8 @@ class FlyControlThread(Thread):
                         break
 
                     else:
-                        motion = self.get_hover_velocity(
-                            current_position, self.hover_position, override_z=self.setting.velocity.land_velocity.get())
+                        motion = self.get_hover_velocity(self.hover_position,
+                                                         override_z=self.setting.velocity.land_velocity.get())
 
                 # Process motion
                 elif self.fly_status == FlyStatus.FLYING:
@@ -1356,9 +1369,8 @@ class FlyControlThread(Thread):
 
                         # Calculate the distance between the holding position and the current position
 
-                        motion = self.get_hover_velocity(
-                            self._drone_state.position, self.hover_position,
-                            motion)
+                        motion = self.get_hover_velocity(self.hover_position,
+                                                         motion)
 
                     if self._maintain_direction is not None:
                         motion = self._direction_correction(motion)
@@ -1483,19 +1495,32 @@ class FlyControlThread(Thread):
         return motion
 
     def get_hover_velocity(self,
-                           drone_position: Position,
                            target: Position,
                            motion: Motion = None,
                            velocity: Motion = None,
+                           hover_cor_max: Position = None,
+                           hover_cor_min: Position = None,
                            override_z: float | None = None
                            ) -> Motion:
-        """Calculate the require `Motion` to ensure the drone can hover on the target location
         """
+        Calculate the velocity to reach the target position
+        Args:
+            target: target position
+            motion: provided a motion to be add on top of the calculated motion
+            velocity: override default hover correction velocity
+            hover_cor_max: override default hover correction max
+            hover_cor_min: override default hover correction min
+            override_z: override the z value of the target position
+
+        Returns:
+
+        """
+
         if motion is None:
             motion = Motion()
 
-        max_distance: Position = self.setting.distance.hover_correction_max_distance.get()
-        min_distance: Position = self.setting.distance.hover_correction_min_distance.get()
+        max_distance: Position = self.setting.distance.hover_correction_max_distance.get() if hover_cor_max is None else hover_cor_max
+        min_distance: Position = self.setting.distance.hover_correction_min_distance.get() if hover_cor_min is None else hover_cor_min
 
         if velocity is None:
             velocity: Motion = self.setting.velocity.hover_correction_velocity.get()
@@ -1503,9 +1528,11 @@ class FlyControlThread(Thread):
         if override_z is not None and isinstance(override_z, float):
             velocity.vz = abs(override_z)
 
-        target_x = drone_position.x if target.x == None else target.x
-        target_y = drone_position.y if target.y == None else target.y
-        target_z = drone_position.z if target.z == None else target.z
+        drone_position = self._drone_state.position
+
+        target_x = drone_position.x if target.x is None else target.x
+        target_y = drone_position.y if target.y is None else target.y
+        target_z = drone_position.z if target.z is None else target.z
 
         target = Position(target_x, target_y, target_z)
 
@@ -1697,11 +1724,11 @@ class FlyControlThread(Thread):
                 self._fly_control.fly_mode = FlyMode.HOVER
         return motion
 
-    def set_hover(self, value: bool):
+    def set_hover(self, value: bool, hover_pos: Position = None):
         """Set all the required parameters for `enable` disable `hover`"""
         # Enable Hover
         if value:
-            self.hover_position = self._drone_state.position
+            self.hover_position = self._drone_state.position if hover_pos is None else hover_pos
 
         else:
             # When disable hover, also clear the hover velocity
@@ -1718,14 +1745,22 @@ class FlyControlThread(Thread):
                self._drone_state.thrust_m3 > 0 and \
                self._drone_state.thrust_m4 > 0
 
-    def _reach_target(self, target: Position, margin: Position) -> bool:
-        """Determine if the drone reach the target. If the drone reach the margin of the target,
-        return true. The margin of the target is define in the setting.
-        Example:
-        >>> _reach_target(Position(0,0.1,0), ) # Margin: 0.1,0.1,0.05, current: 0,0.05,0
-        True
+    def _reach_target(self, target: Position, margin: Position, buffer: List) -> bool:
+        """Determine if the drone reach the target. This will add the current position to the
+        buffer. If the average of the buffer is within the margin, the drone is considered reach
         """
-        return self._drone_state.position.with_in_range(target, margin, ignore_z=True)
+
+        buffer.append(self._drone_state.position)
+
+        avg: Position = buffer.avg()
+
+        # LOGGER.debug(f"Current position: {current_pos}, margin: {margin}, target: {target}, diff: {diff}, avg: {avg}, buffer: {id(buffer)}")
+
+        if avg.with_in_range(target, margin, ignore_z=True):
+            # LOGGER.debug(f"True")
+            buffer.clear()
+            return True
+        return False
 
     def _get_next_movement(self) -> Motion:
         """Calculate the next drone location based on the current location and the current
@@ -1752,11 +1787,15 @@ class FlyControlThread(Thread):
 
         turn_trigger_distance: Position = self.setting.distance.auto_turn_trigger_distance.get()
 
-        hover_trigger_range: Position = self.setting.distance.hover_correction_max_distance.get()
-        hover_min_range: Position = self.setting.distance.hover_correction_min_distance.get()
+        hold_trigger_range: Position = self.setting.distance.hold_correction_max_distance.get()
+        hold_min_range: Position = self.setting.distance.hold_correction_min_distance.get()
         motion = Motion.zero()
 
-        if self._reach_target(target, hover_min_range):
+        # ensure the go to reach buffer is created.
+        if 'go_to_main_reach' not in self._position_buffer_dict:
+            self._position_buffer_dict['go_to_main_reach'] = List(10)
+
+        if self._reach_target(target, hold_min_range, self._position_buffer_dict['go_to_main_reach']):
 
             # Check if currently is in path mode
             if self._path is not None:
@@ -1764,13 +1803,17 @@ class FlyControlThread(Thread):
                 if next_position is not None:
                     self._go_to_helper.reset()
                     self._go_to_helper.target_position = next_position
-                    LOGGER.debug(f"reach target, going to next position: {next_position}")
+                    self._maintain_direction = None
+                    LOGGER.drone(f"reach target {target}, going to next position: {next_position}")
                     return motion
 
                 # path is empty now. Clear it
                 self._path = None
             self.setting.fly_mode.set(FlyMode.HOVER)
+            self.hover_position = target
+            self._maintain_direction = None
             self._go_to_helper.reset()
+            LOGGER.drone(f"Drone reach target: {target}")
             LOGGER.debug(f"reach position at {current_pos}, changed to hover mode")
             return motion
 
@@ -1813,15 +1856,24 @@ class FlyControlThread(Thread):
             self.go_to_set_axis_changing()
 
         if self._go_to_helper.action == GoToAction.HOLD:
+            if 'go_to_hold_reach' not in self._position_buffer_dict:
+                self._position_buffer_dict['go_to_hold_reach'] = List(10)
             # Hold the position until it is in the acceptable range. then do the next action
-            if self._reach_target(self._go_to_helper.hold_position, hover_trigger_range):
+            if self._reach_target(
+                    target=self._go_to_helper.hold_position,
+                    margin=hold_min_range,
+                    buffer=self._position_buffer_dict['go_to_hold_reach']):
                 self._go_to_helper.action = self._go_to_helper.next_action
                 self._go_to_helper.next_action = None
                 LOGGER.debug(
                     f'Hold position reached, next action: {self._go_to_helper.action}')
             else:
                 correction = self.get_hover_velocity(
-                    self._drone_state.position, self._go_to_helper.hold_position)
+                    target=self._go_to_helper.hold_position,
+                    hover_cor_max=hold_trigger_range,
+                    hover_cor_min=hold_min_range,
+                    velocity=self.setting.velocity.hold_correction_velocity.get()
+                )
                 motion = motion + correction
                 self._extra_log = f'Hold position: {self._go_to_helper.hold_position}, correction: {correction}'
 
@@ -1829,8 +1881,7 @@ class FlyControlThread(Thread):
             self._extra_log = (
                 f"Axis Changing to {self._go_to_helper.moving_direction.axis}")
 
-            motion = self.get_hover_velocity(self._drone_state.position,
-                                             self.hover_position)
+            motion = self.get_hover_velocity(self.hover_position)
 
             yaw = self._get_yaw(axis=self._go_to_helper.moving_direction.axis,
                                 dist=dist_to_target,
@@ -1866,7 +1917,7 @@ class FlyControlThread(Thread):
                         -dist_to_target.x,
                         max_value=slow_dist,
                         min_value=0)
-                    self._extra_log = f" To X. Thrust Percent: {thrust_percent}, dist_to_target.x: {dist_to_target.x}"
+                    self._extra_log = f" To X. dist_to_target.x: {dist_to_target.x}"
 
                 # Moving alone with Y axis
                 else:
@@ -1877,7 +1928,7 @@ class FlyControlThread(Thread):
 
                     self._extra_log = f" To Y. dist_to_target.y: {dist_to_target.y}"
 
-                if thrust_percent < 0.1 or self._is_pass_target(
+                if thrust_percent < 0.01 or self._is_pass_target(
                         self._go_to_helper.moving_direction, self._drone_state.position,
                         self._go_to_helper.target_position):
                     # starting approaching the target. Use the hold mode
@@ -1887,7 +1938,7 @@ class FlyControlThread(Thread):
                     LOGGER.debug(f'Reach current axis. Change to hold. (hover_pos: {hover_pos})')
 
                 else:
-                    thrust_percent = thrust_percent * 2
+                    thrust_percent = thrust_percent ** 2 if thrust_percent > 0.5 else 0.25
                     vx = velocity.vy * thrust_percent
                     motion.vx = vx
                     self._extra_log += f" thrust_percent: {thrust_percent}, vx: {vx}"
