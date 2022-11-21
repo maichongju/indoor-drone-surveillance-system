@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from matplotlib.pyplot import set_loglevel
 
+from log.logger import LOGGER
+
 set_loglevel('warning')
 
 from ui.widget.tab.threedplottab import ThreeDPlotVispyTab
@@ -10,6 +12,7 @@ from ui.widget.tab.twodplottab import TwoDPlotTab
 # Must import this before importing matplotlib
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QFileDialog, QTabWidget, QMessageBox
 
+import traceback
 import pandas as pd
 
 EXPORT_FOLDER = 'export'
@@ -66,6 +69,7 @@ class FlightDataWindow(QWidget):
             self.tab_2d.plot(df, file_name)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error when loading file ({e})")
+            LOGGER.debug(traceback.format_exc())
             self.tab_2d.clear()
             self.tab_3d.clear()
 
