@@ -1595,18 +1595,19 @@ class FlyControlThread(Thread):
 
         distance = direction.distance(position.to_point2d())
 
-        maintained_min_distance = self.setting.distance.hover_correction_min_distance.get().y
         maintained_max_distance = self.setting.distance.hover_correction_max_distance.get().y
 
         velocity = self.setting.velocity.hover_correction_velocity.get().vy
 
         percentage = percentage_cal(
-            distance, maintained_min_distance, maintained_max_distance)
+            value=distance,
+            min_value=0,
+            max_value=maintained_max_distance)
 
         if percentage == 0:
             return motion
 
-        velocity = velocity ** 2 * percentage
+        velocity = velocity * percentage
 
         # point on direction
         d_point = Position.from_point2d(direction.points[0])
@@ -1636,6 +1637,7 @@ class FlyControlThread(Thread):
         p1 = Point(position.x, position.y)
         temp = rotate_axis_coord(target.x, target.y, yaw)
         p2 = Point(temp[0], temp[1])
+        LOGGER.debug(f'[Fly Control] current direction: {p1} -> {p2}')
 
         return Line(p1, p2)
 
