@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List
 from typing import Tuple
 
+import jsonpickle
 from cflib.drivers.crazyradio import Crazyradio
 from pandas import DataFrame
 from sympy import Point2D, Point3D, Line
@@ -531,4 +532,4 @@ def dict_to_json_escape_csv(dict_data: dict) -> str:
     """
     Convert the dict to json and escape the double quote for csv
     """
-    return json.dumps(dict_data).replace('"', '""')
+    return jsonpickle.encode(dict_data, unpicklable=False).replace('"', '""')

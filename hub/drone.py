@@ -2130,13 +2130,18 @@ class FlyControlThread(Thread):
             return
         cur_time = time.strftime("%H:%M:%S")
         state_data = self._drone_state.to_csv()
+        extra = "{}"
+        try:
+            extra = dict_to_json_escape_csv(self._extra_log)
+        except Exception as e:
+            LOGGER.debug(f'Error when dumping extra data: {self._extra_log}')
         data = f'{cur_time},' \
                f'{state_data},' \
                f'{motion.to_csv()},' \
                f'{self.setting.hover_position.get().to_csv()},' \
                f'{self.setting.fly_mode.get()},' \
                f'"{self._current_command}",' \
-               f'"{dict_to_json_escape_csv(self._extra_log)}"'
+               f'"{extra}"'
         print(data, file=self._dump_flight_data_file)
 
     def set_land_timeout(self, timeout: float):
