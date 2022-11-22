@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import jsonpickle
 from matplotlib.pyplot import set_loglevel
 
 from log.logger import LOGGER
@@ -65,6 +66,7 @@ class FlightDataWindow(QWidget):
             df['hover.x'] = df['hover.x'].replace({'None': None}).astype(float)
             df['hover.y'] = df['hover.y'].replace({'None': None}).astype(float)
             df['hover.z'] = df['hover.z'].replace({'None': None}).astype(float)
+            df['extra'] = df['extra'].apply(self.process_extra_log)
             self.tab_3d.plot(df, file_name)
             self.tab_2d.plot(df, file_name)
         except Exception as e:
@@ -72,6 +74,16 @@ class FlightDataWindow(QWidget):
             LOGGER.debug(traceback.format_exc())
             self.tab_2d.clear()
             self.tab_3d.clear()
+
+    def process_extra_log(self, value: str):
+        """
+        Process the extra log data, convert it into a dictionary
+        """
+        try:
+            return jsonpickle.decode(value)
+        except Exception as e:
+            LOGGER.debug('Invalid extra log data: %s', value)
+            return {}
 
     def _clear_btn_on_click(self):
         self.tab_3d.clear()

@@ -2,6 +2,7 @@ import pandas as pd
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QGridLayout, QWidget, QScrollArea, QHBoxLayout
 
+from log import DroneExtraLog
 from ui.widget.canvas import CanvasWidget, FigureType
 from ui.widget.tab.tab import Tab
 
@@ -37,9 +38,14 @@ class TwoDPlotTab(Tab):
                                              title='XY Stable')
         main_layout.addWidget(self.xy_stable_canvas, 1, 0)
 
+        self.moving_direction_drift_canvas = CanvasWidget(x_label='', y_label='difference', figure_type=FigureType.PLOT,
+                                                          title='Moving Direction Drift')
+        main_layout.addWidget(self.moving_direction_drift_canvas, 1, 1)
+
         self._canvas.append(self.height_canvas)
         self._canvas.append(self.xy_top_canvas)
         self._canvas.append(self.xy_stable_canvas)
+        self._canvas.append(self.moving_direction_drift_canvas)
 
     def plot(self, df: pd.DataFrame, file_name: str):
         size = len(df.index)
@@ -73,6 +79,13 @@ class TwoDPlotTab(Tab):
         xy_stable_data['y'] = {'y': diff_y}
 
         self.xy_stable_canvas.plot(xy_stable_data, file_name=file_name)
+
+        # Moving Direction Drift Plot
+        drift_data = []
+        for log in df['extra'].to_list():  # type: dict
+            drift_data.append(log.get(DroneExtraLog.MAINTAIN_DIRECTION_OFFSET, 0))
+
+        self.moving_direction_drift_canvas.plot(drift_data, file_name=file_name)
 
     def clear(self):
         [canvas.clear() for canvas in self._canvas]

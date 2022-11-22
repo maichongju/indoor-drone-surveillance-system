@@ -140,17 +140,21 @@ class Canvas2DPlot(Canvas2D):
             more info
         """
         super().plot(points)
-        if not isinstance(points, dict):
+        if not isinstance(points, (dict, list)):
             raise ValueError(f'points must be a list, not {type(points)}')
 
-        for label, value in points.items():  # type: str, dict
-            if not isinstance(value, dict):
-                raise ValueError(f'points must be a dict, not {type(value)}')
+        if isinstance(points, dict):
 
-            if 'x' not in value:
-                self.ax.plot(value['y'], label=label)
-            elif 'x' in value and 'y' in value:
-                self.ax.plot(value['x'], value['y'], label=label)
+            for label, value in points.items():  # type: str, dict
+                if not isinstance(value, dict):
+                    raise ValueError(f'points must be a dict, not {type(value)}')
+
+                if 'x' not in value:
+                    self.ax.plot(value['y'], label=label)
+                elif 'x' in value and 'y' in value:
+                    self.ax.plot(value['x'], value['y'], label=label)
+        else:
+            self.ax.plot(points)
 
         if legend is not None:
             self.ax.legend(loc=legend)
