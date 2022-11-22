@@ -525,3 +525,10 @@ def update_dict(origin_dict: dict, new_dict: dict):
     """
     for key, value in new_dict.items():
         origin_dict[key] = value
+
+
+def dict_to_json_escape_csv(dict_data: dict) -> str:
+    """
+    Convert the dict to json and escape the double quote for csv
+    """
+    return json.dumps(dict_data).replace('"', '""')

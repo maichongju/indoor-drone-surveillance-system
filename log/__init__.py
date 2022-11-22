@@ -1,9 +1,9 @@
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
 
 import jsonpickle
 
+from general.enum import Enum
 from general.utils import Position
 
 LOGGER_LEVEL_DRONE = logging.INFO + 5
@@ -306,3 +306,15 @@ class DroneInfo:
             self.state.get(LogVariable.POSITION_Y.value[0], 0),
             self.state.get(LogVariable.POSITION_Z.value[0], 0)
         )
+
+
+class DroneExtraLog(str, Enum):
+    MODE = 'mode'
+    HOLD_POS = 'hold_pos'
+    HOLD_CORRECTION = 'hold_correction'
+    CORRECTION = 'correction'
+    AXIS_CHANGE_TO = 'axis_change_to'
+    CURRENT_AXIS = 'current_axis'
+    DISTANCE_TO_TARGET = 'distance_to_target'
+    THRUST_PERCENT = 'thrust_percent'
+    MAINTAIN_DIRECTION_OFFSET = 'maintain_direction_offset'
