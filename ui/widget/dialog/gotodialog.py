@@ -44,11 +44,11 @@ class GoToDialog(QDialog):
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
 
-        self._path_widget = self._get_path_tab()
+        # self._path_widget = self._get_path_tab()
 
         # tabs.addTab(self._get_position_tab(), "Position")
         self.tabs.addTab(self._get_position_tab(), "Position")
-        self.tabs.addTab(self._path_widget, "Path")
+        # self.tabs.addTab(self._path_widget, "Path")
 
         self.tabs.currentChanged.connect(lambda index: self.tab_change_cb(index))
 
