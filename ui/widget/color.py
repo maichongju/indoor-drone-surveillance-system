@@ -1,7 +1,11 @@
 from __future__ import annotations
-from general.enum import Enum, auto
-from vispy.color import ColorArray
+
 import random
+
+from vispy.color import ColorArray
+
+from general.enum import Enum
+
 
 class Color(Enum):
     ORANGE = '#FFA500'
@@ -12,6 +16,10 @@ class Color(Enum):
     RED = '#FF0000'
     GREEN = '#00FF00'
     BLUE = '#0000FF'
+    DARK_SKY_BLUE = '#4D90FA'
+    ANDROID_GREEN = '#A4C639'
+    BEE_YELLOW = '#E9AB17'
+    BRILLIANT_ROSE = '#F653A6'
 
     @property
     def hex(self) -> str:
@@ -31,8 +39,10 @@ class Color(Enum):
 
 class VispyColor:
     @staticmethod
-    def get_color(color: Color, opacity: float = 1.0) -> ColorArray:
-        return ColorArray(color = color.hex, alpha=opacity)
+    def get_color(color: Color | str, opacity: float = 1.0) -> ColorArray:
+        if isinstance(color, Color):
+            return ColorArray(color=color.hex, alpha=opacity)
+        return ColorArray(color=color, alpha=opacity)
 
     @staticmethod
     def get_random_color(opacity: float = 1.0) -> ColorArray:

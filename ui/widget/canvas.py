@@ -306,7 +306,7 @@ class Canvas3DVispy(scene.SceneCanvas):
 
         self.freeze()
 
-    def plot_scatter(self, points: List):
+    def plot_scatter(self, points: List, setting: dict = None):
         if not isinstance(points, list) and \
                 not len(points) == 3 and \
                 not isinstance(points[0], list) and \
@@ -314,19 +314,28 @@ class Canvas3DVispy(scene.SceneCanvas):
                 not isinstance(points[2], list) and \
                 not len(points[0]) == len(points[1]) == len(points[2]):
             raise TypeError(f'points must be a list with format [[x1,y1,z1],[x2,y2,z2],...[xn,yn,zn]]')
-        self.clear_marker()
+
+        temp_setting = DEFAULT_MARKER_SETTING.copy()
+        if setting is not None:
+            update_dict(temp_setting, setting)
+
+        setting = temp_setting
+        if 'face_color' not in setting:
+            setting['face_color'] = VispyColor.get_color(Color.DARK_SKY_BLUE)
+
         marker = []
 
         for x, y, z in zip(points[0], points[1], points[2]):
             # self.add_marker(x, y, z)
             marker.append((x, y, z))
 
-        scene.visuals.Markers(
+        points = scene.visuals.Markers(
             pos=np.array(marker),
-            size=5,
-            face_color=ColorArray("#4d90fa"),
             parent=self._view.scene,
+            **setting
         )
+
+        return VispyMarker(marker=points, setting=setting)
 
     def plot_point(self,
                    pos: Tuple[float, float, float],
@@ -570,6 +579,7 @@ class VispyLine:
 
     def clear(self):
         self.line.set_data(pos=None)
+        self.line.parent = None
         self.endpoint.set_data(pos=None)
         self.endpoint.parent = None
         self.clear_text()

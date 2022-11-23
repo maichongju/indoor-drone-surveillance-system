@@ -1883,6 +1883,7 @@ class FlyControlThread(Thread):
 
         if self._go_to_helper.action == GoToAction.AXIS_CHANGING:
             self._extra_log[DroneExtraLog.AXIS_CHANGE_TO] = str(self._go_to_helper.moving_direction.axis)
+            self._extra_log[DroneExtraLog.HOLD_POS] = self._go_to_helper.hold_position
 
             motion = self.get_hover_velocity(self.hover_position)
 
