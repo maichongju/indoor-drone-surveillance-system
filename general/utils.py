@@ -64,6 +64,10 @@ class Position:
 
         return diff <= range
 
+    @staticmethod
+    def zero() -> Position:
+        return Position(0, 0, 0)
+
     def abs(self) -> Position:
         return Position(abs(self.x), abs(self.y), abs(self.z))
 
@@ -356,6 +360,22 @@ def rotate_axis_coord(x: float, y: float, degree: float):
     new_x = x * math.cos(radian) + y * math.sin(radian)
     new_y = -x * math.sin(radian) + y * math.cos(radian)
 
+    return new_x, new_y
+
+
+def rotate_point(point: tuple[float, float], degree: float, rotate_origin: tuple[float, float] = (0, 0)) -> tuple[
+    float, float]:
+    """Rotate the point around the given origin
+    """
+    rad = math.radians(degree)
+    x, y = point
+    origin_x, origin_y = rotate_origin
+    x -= origin_x
+    y -= origin_y
+    new_x = x * math.cos(rad) - y * math.sin(rad)
+    new_y = y * math.cos(rad) + x * math.sin(rad)
+    new_x += origin_x
+    new_y += origin_y
     return new_x, new_y
 
 

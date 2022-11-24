@@ -28,7 +28,7 @@ from general.utils import (Axis, AxisDirection, Direction, Position, GDirection,
                            has_dongle, percentage_cal, rotate_axis_coord,
                            point_relevant_location_yaw, point_relevant_location,
                            get_yaw_from_axis_direction, round_up, get_projection_point,
-                           dict_to_json_escape_csv)
+                           dict_to_json_escape_csv, rotate_point)
 from hub.dronesetting import *
 from hub.firmware import Firmware
 from hub.stream import StreamCallBacks, VideoStream
@@ -685,7 +685,7 @@ class FlyControlVelocity:
     # type Motion
     # max speed for each direction when in auto mode
     auto_velocity: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Motion(0.075, 0.075, 0.1, 360 / 20)))
+        default_factory=lambda: VariableCallback(Motion(0.15, 0.15, 0.1, 360 / 20)))
 
     # type Motion
     # auto avoidance speed
@@ -1107,14 +1107,6 @@ class GoToAction(Enum):
 @dataclass
 class FlyControlGoToHelper:
     target_position: Position | None = None
-
-    hold_position_x: float | None = None
-    hold_position_y: float | None = None
-    hold_position_z: float | None = None
-
-    reach_x: bool = False
-    reach_y: bool = False
-    reach_z: bool = False
 
     moving_direction: AxisDirection = field(default_factory=AxisDirection)
 
@@ -1598,17 +1590,19 @@ class FlyControlThread(Thread):
 
         maintained_max_distance = self.setting.distance.hover_correction_max_distance.get().y
 
-        velocity = self.setting.velocity.hover_correction_velocity.get().vy
+        velocity = self.setting.velocity.hold_correction_velocity.get().vy
 
         percentage = percentage_cal(
             value=distance,
             min_value=0,
             max_value=maintained_max_distance)
 
+        # print(f"{distance}, {percentage}")
+
         if percentage == 0:
             return motion
 
-        velocity = velocity * percentage
+        velocity = percentage ** 2 * velocity
 
         # point on direction
         d_point = Position.from_point2d(direction.points[0])
@@ -1635,7 +1629,8 @@ class FlyControlThread(Thread):
         yaw = self._drone_state.yaw
 
         p1 = Point(position.x, position.y)
-        temp = rotate_axis_coord(target.x, target.y, yaw)
+
+        temp = rotate_point((target.x, target.y), yaw, (position.x, position.y))
         p2 = Point(temp[0], temp[1])
         LOGGER.debug(f'[Fly Control] current direction: {p1} -> {p2}')
 
@@ -1753,7 +1748,8 @@ class FlyControlThread(Thread):
         """
 
         buffer.append(self._drone_state.position)
-
+        if not buffer.is_full:
+            return False
         avg: Position = buffer.avg()
 
         # LOGGER.debug(f"Current position: {current_pos}, margin: {margin}, target: {target}, diff: {diff}, avg: {avg}, buffer: {id(buffer)}")
@@ -1857,15 +1853,21 @@ class FlyControlThread(Thread):
                 self._go_to_helper.moving_direction.axis = Axis.Y if self._go_to_helper.moving_direction.axis == Axis.X else Axis.X
 
             self.go_to_set_axis_changing()
+        self._extra_log[DroneExtraLog.GO_TO_MODE] = self._go_to_helper.action.name
 
         if self._go_to_helper.action == GoToAction.HOLD:
             if 'go_to_hold_reach' not in self._position_buffer_dict:
                 self._position_buffer_dict['go_to_hold_reach'] = List(10)
             # Hold the position until it is in the acceptable range. then do the next action
+            # print(self._go_to_helper.hold_position)
             if self._reach_target(
                     target=self._go_to_helper.hold_position,
                     margin=hold_min_range,
                     buffer=self._position_buffer_dict['go_to_hold_reach']):
+
+                # Check if next action is moving, if it is moving remove the hold position
+                if self._go_to_helper.next_action == GoToAction.MOVING:
+                    self._go_to_helper.hold_position = None
                 self._go_to_helper.action = self._go_to_helper.next_action
                 self._go_to_helper.next_action = None
                 LOGGER.debug(
@@ -1874,18 +1876,23 @@ class FlyControlThread(Thread):
                 correction = self.get_hover_velocity(
                     target=self._go_to_helper.hold_position,
                     hover_cor_max=hold_trigger_range,
-                    hover_cor_min=hold_min_range,
+                    hover_cor_min=Position.zero(),
                     velocity=self.setting.velocity.hold_correction_velocity.get()
                 )
                 motion = motion + correction
                 self._extra_log[DroneExtraLog.HOLD_POS] = self._go_to_helper.hold_position
                 self._extra_log[DroneExtraLog.HOLD_CORRECTION] = correction
 
-        if self._go_to_helper.action == GoToAction.AXIS_CHANGING:
+        elif self._go_to_helper.action == GoToAction.AXIS_CHANGING:
             self._extra_log[DroneExtraLog.AXIS_CHANGE_TO] = str(self._go_to_helper.moving_direction.axis)
             self._extra_log[DroneExtraLog.HOLD_POS] = self._go_to_helper.hold_position
 
-            motion = self.get_hover_velocity(self.hover_position)
+            motion = self.get_hover_velocity(
+                target=self._go_to_helper.hold_position,
+                hover_cor_min=Position.zero(),
+                hover_cor_max=self.setting.distance.hold_correction_max_distance.get(),
+                velocity=self.setting.velocity.hold_correction_velocity.get()
+            )
 
             yaw = self._get_yaw(axis=self._go_to_helper.moving_direction.axis,
                                 dist=dist_to_target,
@@ -1899,11 +1906,10 @@ class FlyControlThread(Thread):
 
             # Ensure the average of yaw
             if self._go_to_helper.yaw_buffer.avg() == 0:
-                self._change_to_hold(self.hover_position, GoToAction.MOVING)
+                self._change_to_hold(GoToAction.MOVING)
                 self._go_to_helper.moving_direction = AxisDirection.from_yaw(
                     current_yaw)
                 self._set_maintain_direction(True)
-                self.hover_position = Position(None, None, None)
                 # self._go_to_helper.hold_position = self._drone_state.position
 
         elif self._go_to_helper.action == GoToAction.MOVING:
@@ -1918,7 +1924,7 @@ class FlyControlThread(Thread):
                 if self._go_to_helper.moving_direction.axis == Axis.X:
 
                     thrust_percent = percentage_cal(
-                        -dist_to_target.x,
+                        dist_to_target_abs.x,
                         max_value=slow_dist,
                         min_value=0)
                     self._extra_log[DroneExtraLog.CURRENT_AXIS] = 'X'
@@ -1927,24 +1933,26 @@ class FlyControlThread(Thread):
                 # Moving alone with Y axis
                 else:
                     thrust_percent = percentage_cal(
-                        -dist_to_target.y,
+                        dist_to_target_abs.y,
                         max_value=slow_dist,
                         min_value=0)
 
                     self._extra_log[DroneExtraLog.CURRENT_AXIS] = 'Y'
                     self._extra_log[DroneExtraLog.DISTANCE_TO_TARGET] = dist_to_target.y
 
+                self._extra_log[DroneExtraLog.THRUST_PERCENT] = thrust_percent
+
                 if thrust_percent < 0.01 or self._is_pass_target(
                         self._go_to_helper.moving_direction, self._drone_state.position,
                         self._go_to_helper.target_position):
                     # starting approaching the target. Use the hold mode
                     hover_pos = get_projection_point(self._maintain_direction, self._drone_state.position)
-                    self._change_to_hold(hover_pos,
-                                         GoToAction.REQUIRE_AXIS_CHANGE)
+                    self._change_to_hold(hold_position=hover_pos,
+                                         next_action=GoToAction.REQUIRE_AXIS_CHANGE)
                     LOGGER.debug(f'Reach current axis. Change to hold. (hover_pos: {hover_pos})')
 
                 else:
-                    thrust_percent = thrust_percent ** 2 if thrust_percent > 0.5 else 0.25
+                    thrust_percent = thrust_percent if thrust_percent > 0.5 else 0.5
                     vx = velocity.vy * thrust_percent
                     motion.vx = vx
                     self._extra_log[DroneExtraLog.THRUST_PERCENT] = thrust_percent
@@ -1967,9 +1975,10 @@ class FlyControlThread(Thread):
 
         return motion
 
-    def _change_to_hold(self, hold_position: Position, next_action: GoToAction):
+    def _change_to_hold(self, next_action: GoToAction, hold_position: Position = None):
         self._go_to_helper.action = GoToAction.HOLD
-        self._go_to_helper.hold_position = hold_position
+        if hold_position is not None:
+            self._go_to_helper.hold_position = hold_position
         self._go_to_helper.next_action = next_action
 
     def _set_maintain_direction(self, enable: bool):
@@ -2153,7 +2162,7 @@ class FlyControlThread(Thread):
         self._go_to_helper.action = GoToAction.AXIS_CHANGING
         self._go_to_helper.yaw_buffer.clear()
         self._set_maintain_direction(False)
-        self.hover_position = self._drone_state.position
+        self._go_to_helper.hold_position = self._drone_state.position
 
     @property
     def setting(self) -> FlyControlSetting:

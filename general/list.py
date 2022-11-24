@@ -80,3 +80,9 @@ class List:
         """Return True if the list is empty.
         """
         return len(self._data) == 0
+
+    @property
+    def is_full(self) -> bool:
+        """Return True if the list is full.
+        """
+        return self._max_size != -1 and len(self._data) == self._max_size

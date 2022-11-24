@@ -1,7 +1,7 @@
 from __future__ import annotations
-from .firmware import DroneModel
-from general.enum import Enum
 
+from general.enum import Enum
+from .firmware import DroneModel
 
 manually_control_velocity = 0.2
 
@@ -12,7 +12,6 @@ auto_avoidance_velocity = 0.2
 hover_correction_velocity = 0.02
 
 yaw_rate = 360 / 10
-
 
 # low voltage: Display warning message
 # critical voltage: Land the drone
