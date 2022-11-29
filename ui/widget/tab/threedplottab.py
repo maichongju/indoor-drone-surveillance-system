@@ -133,16 +133,17 @@ class ThreeDPlotVispyTab(Tab):
         for mode, data in temp_dict.items():
             if mode == FlyMode.TARGET.name:
                 for action, coord in data.items():
-                    match action:
-                        case GoToAction.HOLD.name:
-                            self._markers[mode][action] = self.canvas.plot_scatter(coord,
-                                                                                   {'face_color': COLOR_GO_TO_HOLD})
-                        case GoToAction.MOVING.name:
-                            self._markers[mode][action] = self.canvas.plot_scatter(coord,
-                                                                                   {'face_color': COLOR_GO_TO_MOVING})
-                        case GoToAction.AXIS_CHANGING.name:
-                            self._markers[mode][action] = self.canvas.plot_scatter(coord, {
-                                'face_color': COLOR_GO_TO_AXIS_CHANGING})
+                    if len(coord[0]) > 0:
+                        match action:
+                            case GoToAction.HOLD.name:
+                                self._markers[mode][action] = self.canvas.plot_scatter(coord,
+                                                                                       {'face_color': COLOR_GO_TO_HOLD})
+                            case GoToAction.MOVING.name:
+                                self._markers[mode][action] = self.canvas.plot_scatter(coord,
+                                                                                       {'face_color': COLOR_GO_TO_MOVING})
+                            case GoToAction.AXIS_CHANGING.name:
+                                self._markers[mode][action] = self.canvas.plot_scatter(coord, {
+                                    'face_color': COLOR_GO_TO_AXIS_CHANGING})
             else:
                 self._markers[mode] = self.canvas.plot_scatter(data)
 

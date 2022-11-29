@@ -15,7 +15,7 @@ from config import Config
 from general.utils import has_dongle, ensure_file_exist
 from hub.hub import Hub
 from hub.location import LOCATIONS
-from hub.path import PathList
+from map.path import PathList
 from log.logger import LOGGER
 from ui.widget.dialog import LocationDialog, PathDialog
 from ui.widget.tab.dronetab import DroneWidget

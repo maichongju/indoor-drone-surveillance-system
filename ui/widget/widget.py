@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import QWidget, QInputDialog, QMessageBox, QGroupBox
 from general.enum import IntEnum
 from general.utils import Position
 from hub.drone import Drone
-from hub.path import Path, PathList
+from map.path import Path, PathList
 from log.logger import LOGGER
 from ml.objectdetection import Result
 from . import Location

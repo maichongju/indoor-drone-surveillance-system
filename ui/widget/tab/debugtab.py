@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QGridLayout,
 
 from general.utils import AxisDirection
 from hub.drone import Drone, FlyControlMode, FlyMode, Motion, Position, DronePowerAction
-from hub.path import Path
+from map.path import Path
 from ui.widget.dialog.locationeditdialog import LocationEditDialog
 from ui.widget.tab.tab import Tab
 

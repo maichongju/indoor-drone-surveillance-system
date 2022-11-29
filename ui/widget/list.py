@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QListWidgetItem
 from general.utils import Position
 from hub.location import LOCATIONS
 from hub.location import Location
-from hub.path import PathList, Path
+from map.path import PathList, Path
 from log.logger import LOGGER
 
 

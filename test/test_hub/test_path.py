@@ -1,5 +1,5 @@
 from general.utils import Position
-from hub.path import PathList, Path
+from map.path import PathList, Path
 
 FOLDER_PATH = 'path/'
 

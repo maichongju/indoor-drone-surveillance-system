@@ -7,7 +7,7 @@ from general.enum import Enum
 from general.utils import Axis, Position
 from hub.drone import Drone
 from hub.location import Location, LOCATIONS
-from hub.path import PathList, Path
+from map.path import PathList, Path
 from log.logger import LOGGER
 from ui.icon import Icon
 from ui.widget.dialog.locationeditdialog import LocationEditDialog

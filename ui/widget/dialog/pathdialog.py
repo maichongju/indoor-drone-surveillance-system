@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox
 
-from hub.path import PathList
+from map.path import PathList
 from ui.widget.widget import PathEditWidget
 
 DEFAULT_PATH_LOCATION = 'paths.json'

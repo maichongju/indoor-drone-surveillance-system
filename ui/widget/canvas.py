@@ -13,7 +13,7 @@ from vispy.color import ColorArray
 
 from general.enum import Enum, auto
 from general.utils import ensure_folder_exist, Position, update_dict
-from hub.path import Path
+from map.path import Path
 from log.logger import LOGGER
 from .color import Color, VispyColor
 
