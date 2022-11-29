@@ -234,6 +234,20 @@ class AxisDirection:
             else:
                 return Point2D(0, -1)
 
+    def get_opposite(self) -> AxisDirection:
+        if not self.is_complete():
+            raise ValueError('Axis and direction must be set')
+        if self.axis == Axis.X:
+            if self.direction == Direction.POSITIVE:
+                return AxisDirection(Axis.X, Direction.NEGATIVE)
+            else:
+                return AxisDirection(Axis.X, Direction.POSITIVE)
+        else:
+            if self.direction == Direction.POSITIVE:
+                return AxisDirection(Axis.Y, Direction.NEGATIVE)
+            else:
+                return AxisDirection(Axis.Y, Direction.POSITIVE)
+
     def reset(self):
         self.axis = None
         self.direction = None

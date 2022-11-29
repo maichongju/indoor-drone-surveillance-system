@@ -4,3 +4,4 @@
 
 PATH_PATH = 'paths.json'
 PATH_LOCATION = 'locations.json'
+PATH_MAP = 'map.json'
