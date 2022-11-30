@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from general.utils import Position, AxisDirection
+from log.logger import  LOGGER
 
 
 class MapNode:
@@ -132,8 +133,23 @@ class MapNode:
         return temp_directions.index(direction)
 
     def remove_neighbour(self, direction: AxisDirection):
-        # TODO
-        pass
+        """
+        Remove the neighbour of the current node in the given direction. Can only remove the node if the neighbour have
+        no other neighbour on the opposite side.
+        """
+        
+        target_node = self.get_neighbour(direction).node
+        if target_node is None:
+            LOGGER.debug(f'No neighbour in direction {direction} to remove ({self.id}, {self.position})')
+            return
+
+        other_axis = direction.rotate_left()
+        if self.get_neighbour(other_axis).node is not None or self.get_neighbour(other_axis.get_opposite()).node is not None:
+            LOGGER.debug(f'Cannot remove neighbour in direction {direction}. {other_axis.axis.name} is not empty ({self.id}, {self.position})')
+            return
+
+        if target_node.get_neighbour(direction).node is not None:
+            self.set_neighbour(target_node.get_neighbour(direction).node, direction)
 
     def get_neighbour(self, direction: AxisDirection):
         if not isinstance(direction, AxisDirection):
