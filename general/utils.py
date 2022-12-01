@@ -42,6 +42,9 @@ class Position:
         distance = (diff.x ** 2 + diff.y ** 2 + diff.z ** 2) ** 0.5
         return distance
 
+    def round(self, decimal: int = 2):
+        return Position(round(self.x, decimal), round(self.y, decimal), round(self.z, decimal))
+
     def with_in_range(self, other: Position, range: Position, ignore_z: bool = False) -> bool:
         """ Determine if the other position is within range of this position
         Example:

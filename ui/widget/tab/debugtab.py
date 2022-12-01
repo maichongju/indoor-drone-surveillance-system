@@ -2,11 +2,13 @@ from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QGridLayout,
                              QHBoxLayout, QLabel, QPushButton, QRadioButton)
 
+import setting
 from general.utils import AxisDirection
 from hub.drone import Drone, FlyControlMode, FlyMode, Motion, Position, DronePowerAction
-from map.path import Path
+from log.logger import LOGGER
 from ui.widget.dialog.locationeditdialog import LocationEditDialog
 from ui.widget.tab.tab import Tab
+from map.path import PathList, Path
 
 
 class DebugTabSignal(QObject):
@@ -169,6 +171,12 @@ class DebugTab(Tab):
         main_layout.addLayout(layout, row, 1)
         row += 1
 
+        main_layout.addWidget(QLabel("Path Test"), row, 0)
+        self.btn_path_test = QPushButton("Go To Path1")
+        self.btn_path_test.clicked.connect(self._path_test_on_click)
+        main_layout.addWidget(self.btn_path_test, row, 1)
+        row += 1
+
     def _add_callbacks(self):
         self._setting.fly_mode.callbacks.add_callback(
             self.signals.fly_mode.emit)
@@ -280,3 +288,14 @@ class DebugTab(Tab):
         dialog = LocationEditDialog(show_name=False, mode=LocationEditDialog.Mode.ADD)
         if dialog.exec():
             self._setting.hover_position.set(dialog.location.position)
+
+    def _path_test_on_click(self):
+        try:
+            with open(setting.PATH_PATH, 'r') as f:
+                paths = PathList.load(f)
+                self._drone.fly_control.go_to(paths[0])
+
+        except IOError:
+            LOGGER.error("Cannot load path file")
+        except Exception as e:
+            LOGGER.error("Cannot load path file: " + str(e))

@@ -611,3 +611,7 @@ class PathEditWidget(QWidget):
         if self.path_list.currentRow() == -1:
             return None
         return self.path_list.currentItem().path
+
+    def save(self):
+        self.path_detail.apply_change()
+        self._set_path_detail_is_updated(False)

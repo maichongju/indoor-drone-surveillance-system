@@ -173,7 +173,7 @@ class DroneInfo:
             #     self._cache_state[key].append(value)
             #
             # self.state[key] = self._cache_state[key].avg()
-            self.state[key] = value if not isinstance(value, float) else round(value, 3)
+            self.state[key] = value if not isinstance(value, float) else round(value, 2)
 
     def _mm_to_m(self, mm: float | None) -> float | None:
         """Convert mm to cm
