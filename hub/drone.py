@@ -694,7 +694,7 @@ class FlyControlVelocity:
 
     # type Motion
     hover_correction_velocity: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Motion(0.1, 0.1, 0.05, 0)))
+        default_factory=lambda: VariableCallback(Motion(0.05, 0.05, 0.05, 0)))
 
     hold_correction_velocity: VariableCallback = field(
         default_factory=lambda: VariableCallback(Motion(0.1, 0.1, 0.05, 0)))
@@ -724,16 +724,16 @@ class FlyControlDistance:
 
     # type Position
     hover_correction_max_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Position(0.1, 0.1, 0.05)))
+        default_factory=lambda: VariableCallback(Position(0.15, 0.15, 0.05)))
 
     # Distance for go to hold. More distance
     # type Position
     hold_correction_min_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Position(0.15, 0.15, 0.1)))
+        default_factory=lambda: VariableCallback(Position(0.10, 0.10, 0.1)))
 
     # type Position
     hold_correction_max_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Position(0.3, 0.3, 0.05)))
+        default_factory=lambda: VariableCallback(Position(0.2, 0.2, 0.05)))
 
     # type Position
     # Distance for auto avoidance to trigger
@@ -752,7 +752,7 @@ class FlyControlDistance:
 
     # type float
     auto_slow_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(0.6))
+        default_factory=lambda: VariableCallback(0.5))
 
     # type float
     # Distance for yaw correction
@@ -1259,6 +1259,7 @@ class FlyControlThread(Thread):
                     current_position = self._drone_state.position
                     if current_position.z < self.setting.distance.take_off_height.get():
                         motion = self.get_hover_velocity(self.hover_position,
+                                                         velocity=Motion(0.1, 0.1, 0.1, 0),
                                                          override_z=self.setting.velocity.take_off_velocity.get())
 
                     else:
@@ -1368,7 +1369,8 @@ class FlyControlThread(Thread):
                                                          motion)
 
                     if self._maintain_direction is not None and \
-                        (self._fly_control.fly_mode == FlyMode.TARGET and self._go_to_helper.action == GoToAction.MOVING):
+                            (
+                                    self._fly_control.fly_mode == FlyMode.TARGET and self._go_to_helper.action == GoToAction.MOVING):
                         motion = self._direction_correction(motion)
 
                     # Auto Avoid
@@ -1896,7 +1898,7 @@ class FlyControlThread(Thread):
                 target=self._go_to_helper.hold_position,
                 hover_cor_min=Position.zero(),
                 hover_cor_max=self.setting.distance.hold_correction_max_distance.get(),
-                velocity=self.setting.velocity.hold_correction_velocity.get()
+                velocity=self.setting.velocity.hover_correction_velocity.get()
             )
 
             yaw = self._get_yaw(axis=self._go_to_helper.moving_direction.axis,
@@ -1975,7 +1977,8 @@ class FlyControlThread(Thread):
                     else:
                         self._go_to_helper.moving_direction = self._go_to_helper.moving_direction.rotate_left()
                     self._go_to_helper.avoiding_obstacle = False
-                    hold_pos = self._add_to_current_facing(self.setting.distance.moving_side_maintain_distance.get() + 0.1)
+                    hold_pos = self._add_to_current_facing(
+                        self.setting.distance.moving_side_maintain_distance.get() + 0.1)
                     self._change_to_hold(next_action=GoToAction.AXIS_CHANGING, hold_position=hold_pos)
 
                 else:
@@ -2167,8 +2170,8 @@ class FlyControlThread(Thread):
         state_data = self._drone_state.to_csv()
         extra = "{}"
         try:
-            for key,value in self._extra_log.items():
-                if isinstance(value, (int,float)):
+            for key, value in self._extra_log.items():
+                if isinstance(value, (int, float)):
                     self._extra_log[key] = round(value, 3)
             extra = dict_to_json_escape_csv(self._extra_log)
         except Exception as e:
