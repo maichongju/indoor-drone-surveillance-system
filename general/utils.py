@@ -251,6 +251,20 @@ class AxisDirection:
             else:
                 return AxisDirection(Axis.Y, Direction.POSITIVE)
 
+    def to_yaw(self) -> float:
+        if not self.is_complete():
+            raise ValueError('Axis and direction must be set')
+        if self.axis == Axis.X:
+            if self.direction == Direction.POSITIVE:
+                return 0
+            else:
+                return 180
+        else:
+            if self.direction == Direction.POSITIVE:
+                return 90
+            else:
+                return -90
+
     def reset(self):
         self.axis = None
         self.direction = None
@@ -261,6 +275,14 @@ class Axis(Enum):
     Y = auto(),
     Z = auto()
 
+    def opposite(self) -> Axis:
+        """Get the opposite axis, only works for X and Y"""
+        if self == Axis.X:
+            return Axis.Y
+        elif self == Axis.Y:
+            return Axis.X
+        else:
+            return Axis.Z
 
 class Direction(IntEnum):
     """Direction of the axis
@@ -398,7 +420,7 @@ def rotate_point(point: tuple[float, float], degree: float, rotate_origin: tuple
 
 def point_relevant_location_yaw(p1: Position, p2: Position, yaw: float) -> GDirection:
     """This function only consider 2d plane. It will return the relevant direction 
-    of the point. this consider the yaw of the drone 
+    of the point. this consider the yaw of the drone. WEST means left, EAST means right,
     Example:
         >>> point_location(Position(1,1), Position(2,1))
         POSITIVE
@@ -570,3 +592,20 @@ def dict_to_json_escape_csv(dict_data: dict) -> str:
     Convert the dict to json and escape the double quote for csv
     """
     return jsonpickle.encode(dict_data, unpicklable=False).replace('"', '""')
+
+
+def is_behind_me(current: Position, target: Position, direction: AxisDirection) -> bool:
+    """
+    Check if the target is behind me on current axis
+    """
+    dist = current - target
+    if direction.axis == Axis.X:
+        if direction.direction == Direction.POSITIVE:
+            return dist.x > 0
+        else:
+            return dist.x < 0
+    elif direction.axis == Axis.Y:
+        if direction.direction == Direction.POSITIVE:
+            return dist.y > 0
+        else:
+            return dist.y < 0

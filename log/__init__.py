@@ -319,3 +319,5 @@ class DroneExtraLog(str, Enum):
     THRUST_PERCENT = 'thrust_percent'
     MAINTAIN_DIRECTION_OFFSET = 'maintain_direction_offset'
     GO_TO_MODE = 'go_to_mode'
+    AVOIDING_OBSTACLE = 'avoiding_obstacle'
+    OBSTACLE_DIRECTION = 'obstacle_direction'
