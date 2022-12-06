@@ -321,3 +321,4 @@ class DroneExtraLog(str, Enum):
     GO_TO_MODE = 'go_to_mode'
     AVOIDING_OBSTACLE = 'avoiding_obstacle'
     OBSTACLE_DIRECTION = 'obstacle_direction'
+    OBSTACLE_DISTANCE_AVG = 'obstacle_distance_avg'

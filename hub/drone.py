@@ -768,7 +768,7 @@ class FlyControlDistance:
 
     # type float
     moving_side_maintain_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(0.7))
+        default_factory=lambda: VariableCallback(0.5))
 
     # type float
     # The margin distance that allows the drone to drift from the obstacle
@@ -1233,6 +1233,7 @@ class FlyControlThread(Thread):
                     self.setting.fly_mode.set(FlyMode.TARGET)
                     self._go_to_helper.reset()
                     self._go_to_helper.target_position = command
+                    self._path = None
 
                 # Path command
                 elif isinstance(command, Path):
@@ -1636,6 +1637,14 @@ class FlyControlThread(Thread):
         target = position + Position(1, 0, 0)
 
         yaw = self._drone_state.yaw
+        if -45 < yaw < 45:
+            yaw = 0
+        elif 45 < yaw < 135:
+            yaw = 90
+        elif -135 < yaw < -45:
+            yaw = -90
+        else:
+            yaw = 180
 
         p1 = Point(position.x, position.y)
 
@@ -1976,18 +1985,19 @@ class FlyControlThread(Thread):
                 self._extra_log[DroneExtraLog.OBSTACLE_DIRECTION] = self._go_to_helper.obstacle_direction.name
 
                 if self._go_to_helper.avoiding_obstacle_special_position is not None:
-                    if is_behind_me(self._drone_state.position, self._go_to_helper.avoiding_obstacle_special_position,
+                    if not is_behind_me(self._drone_state.position, self._go_to_helper.avoiding_obstacle_special_position,
                                     self._go_to_helper.moving_direction):
                         return Motion.forward(self.setting.velocity.auto_velocity.get().vx)
 
                     else:
                         self._go_to_helper.avoiding_obstacle_special_position = None
 
-                monitor_dist = self._drone_state.left_distance if self._go_to_helper.obstacle_direction == Direction.NEGATIVE \
-                    else self._drone_state.right_distance
+                monitor_dist = self._drone_state.right_distance if self._go_to_helper.obstacle_direction == Direction.NEGATIVE \
+                    else self._drone_state.left_distance
 
                 # cur_direction = AxisDirection.from_yaw(current_yaw)
                 self._obstacle_avoidance_buffer.append(monitor_dist)
+                self._extra_log[DroneExtraLog.OBSTACLE_DISTANCE_AVG] = self._obstacle_avoidance_buffer.avg()
 
                 if self._obstacle_avoidance_buffer.is_full and \
                         self._obstacle_avoidance_buffer.avg() > self.setting.distance.moving_side_maintain_distance.get() + \
@@ -2011,17 +2021,17 @@ class FlyControlThread(Thread):
                         self._go_to_helper.moving_direction = self._go_to_helper.moving_direction.rotate_left()
 
                     hold_pos = self._add_to_direction_facing(
-                        self.setting.distance.moving_side_maintain_distance.get() + 0.3)
+                        self.setting.distance.moving_side_maintain_distance.get())
                     self._change_to_hold(next_action=GoToAction.AXIS_CHANGING, hold_position=hold_pos)
                     motion = motion.zero()
 
                     if not self._is_target_same_side_obstacle():
                         self._go_to_helper.avoiding_obstacle = False
                         self._go_to_helper.avoiding_obstacle_special_position = None
-
-                    self._go_to_helper.avoiding_obstacle_special_position = self._add_to_direction_facing(
-                        self.setting.distance.moving_side_maintain_distance.get() + 0.8,
-                        self._go_to_helper.moving_direction)
+                    else:
+                        self._go_to_helper.avoiding_obstacle_special_position = self._add_to_direction_facing(
+                            self.setting.distance.moving_side_maintain_distance.get(),
+                            self._go_to_helper.moving_direction)
                     self._obstacle_avoidance_buffer.clear()
 
                 else:
@@ -2030,9 +2040,14 @@ class FlyControlThread(Thread):
         return motion
 
     def _is_target_same_side_obstacle(self) -> bool:
+        """
+        This will check if the target is on the same side of the obstacle by using the moving direction yaw
+        Returns:
+
+        """
         cur_pos = self._drone_state.position
         target_pos = self._go_to_helper.target_position
-        yaw = self._drone_state.yaw
+        yaw = self._go_to_helper.moving_direction.to_yaw()
         obstacle_direction = self._go_to_helper.obstacle_direction
 
         target_relevant = point_relevant_location_yaw(cur_pos, target_pos, yaw)
@@ -2194,7 +2209,7 @@ class FlyControlThread(Thread):
                 else:
                     yaw = max(-max_yaw, -move_yaw)
 
-        return round(yaw, 1)
+        return round(yaw, 0)
 
     def _get_yaw_new(self, maintain_yaw: float, current_yaw: float, margin: float, max_yaw: float):
         # TODO maintain at any yaw
