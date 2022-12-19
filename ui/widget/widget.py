@@ -249,6 +249,7 @@ class DroneStreamWidget(QFrame):
         self._display_name = display_name
         self._name_location = name_location
         self._signals = _VideoStreamSignal()
+        self._save_file = None
         self._always_show_original_stream = always_show_original_stream
         if style_sheet is not None:
             self.setStyleSheet(style_sheet)
@@ -611,3 +612,7 @@ class PathEditWidget(QWidget):
         if self.path_list.currentRow() == -1:
             return None
         return self.path_list.currentItem().path
+
+    def save(self):
+        self.path_detail.apply_change()
+        self._set_path_detail_is_updated(False)

@@ -17,8 +17,8 @@ class PathDialog(QDialog):
     def _setup_ui(self):
         layout = QVBoxLayout()
         self.setLayout(layout)
-        path_widget = PathEditWidget(self._path_list)
-        layout.addWidget(path_widget)
+        self.path_widget = PathEditWidget(self._path_list)
+        layout.addWidget(self.path_widget)
 
         bottom_btn_layout = QHBoxLayout()
         layout.addLayout(bottom_btn_layout)
@@ -34,6 +34,7 @@ class PathDialog(QDialog):
         bottom_btn_layout.addWidget(btn_cancel)
 
     def _btn_save_onclick(self):
+        self.path_widget.save()
         try:
             with open(DEFAULT_PATH_LOCATION, 'w') as file:
                 self._path_list.save(file)

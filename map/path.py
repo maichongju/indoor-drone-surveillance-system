@@ -41,7 +41,11 @@ class Path:
         """ Get the next point in the path. If there is no next point, `None` is returned. 
         """
         if self._current >= len(self._positions):
-            return None
+            if self.connected:
+                self._current = 0
+            else:
+                return None
+            self._current = 0
         point = self._positions[self._current]
         self._current += 1
         return point

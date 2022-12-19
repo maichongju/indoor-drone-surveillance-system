@@ -173,7 +173,7 @@ class DroneInfo:
             #     self._cache_state[key].append(value)
             #
             # self.state[key] = self._cache_state[key].avg()
-            self.state[key] = value if not isinstance(value, float) else round(value, 3)
+            self.state[key] = value if not isinstance(value, float) else round(value, 2)
 
     def _mm_to_m(self, mm: float | None) -> float | None:
         """Convert mm to cm
@@ -308,14 +308,4 @@ class DroneInfo:
         )
 
 
-class DroneExtraLog(str, Enum):
-    MODE = 'mode'
-    HOLD_POS = 'hold_pos'
-    HOLD_CORRECTION = 'hold_correction'
-    CORRECTION = 'correction'
-    AXIS_CHANGE_TO = 'axis_change_to'
-    CURRENT_AXIS = 'current_axis'
-    DISTANCE_TO_TARGET = 'distance_to_target'
-    THRUST_PERCENT = 'thrust_percent'
-    MAINTAIN_DIRECTION_OFFSET = 'maintain_direction_offset'
-    GO_TO_MODE = 'go_to_mode'
+

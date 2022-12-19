@@ -63,6 +63,7 @@ class VideoStream:
         self.callbacks = StreamCallBacks()
         self._stream = None
         self.od_result = None
+        self.save_video = False
         self.callbacks.new_frame_od_enabled.add_callback(self._od_callback)
 
     def _od_callback(self, result: Result):
@@ -83,7 +84,9 @@ class VideoStream:
                 self.callbacks,
                 self._resolution,
                 self._model,
-                object_detection_enable=self._object_detection_enable)
+                object_detection_enable=self._object_detection_enable,
+                save_video=self.save_video
+                )
         self._stream.start()
 
     def stop(self):
@@ -178,7 +181,8 @@ class VideoStreamThread(Thread):
                  callbacks: StreamCallBacks,
                  resolution: tuple,
                  _model: ObjectDetection,
-                 object_detection_enable: bool = False):
+                 object_detection_enable: bool = False,
+                 save_video: bool = False):
         super().__init__()
         if url.lower() == 'camera':
             self._url = 0
@@ -192,6 +196,18 @@ class VideoStreamThread(Thread):
         self._model = _model
         self._created_time = datetime.now()
         self._start_notify = Event()
+        if save_video:
+            # self._video_writer = cv2.VideoWriter(
+            #     f'videos/{self._created_time.strftime("%Y%m%d_%H%M%S")}.avi',
+            #     cv2.VideoWriter_fourcc(*'MJPG'),
+            #     20,
+            #     self._resolution
+            #     )
+            self._video_writer = cv2.VideoWriter('filename.avi',
+                            cv2.VideoWriter_fourcc(*'MJPG'),
+                            10, self._resolution)
+        else:
+            self._video_writer = None
 
     def run(self):
         try:
@@ -217,6 +233,7 @@ class VideoStreamThread(Thread):
                     self._callbacks.connection_lost.call()
                     break
                 ret, frame = stream.read()
+                self._video_writer.write(frame) if self._video_writer is not None else None
                 if not ret:
                     LOGGER.warning(f"Stream connection lost {self._url}")
                     self._callbacks.connection_lost.call()
@@ -231,6 +248,7 @@ class VideoStreamThread(Thread):
                     self._callbacks.new_frame_od_enabled.call(_frame)
                 self._callbacks.new_frame.call(frame)
             stream.release()
+            self._video_writer.release() if self._video_writer is not None else None
         except AttributeError as e:
             #! Application is closed before stream is closed
             LOGGER.debug(
