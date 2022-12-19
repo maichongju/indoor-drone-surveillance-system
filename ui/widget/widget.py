@@ -249,6 +249,7 @@ class DroneStreamWidget(QFrame):
         self._display_name = display_name
         self._name_location = name_location
         self._signals = _VideoStreamSignal()
+        self._save_file = None
         self._always_show_original_stream = always_show_original_stream
         if style_sheet is not None:
             self.setStyleSheet(style_sheet)

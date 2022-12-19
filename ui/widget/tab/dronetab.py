@@ -857,12 +857,17 @@ class VideoStream(QWidget):
             lambda: self._drone.set_object_detection(self.cb_object_detection.isChecked()))
         btn_layout.addWidget(self.cb_object_detection)
 
+        self.cb_save_video = QCheckBox("save video")
+        self.cb_save_video.setChecked(False)
+        btn_layout.addWidget(self.cb_save_video)
+
         self.video = DroneStreamWidget(self._drone, self._resolution)
         layout.addWidget(self.video)
 
     def _stream_start(self):
         self.btn_start.setEnabled(False)
         self.btn_stop.setEnabled(False)
+        self._drone._video_stream.save_video = self.cb_save_video.isChecked()
         thread = Thread(target=self._drone.stream_start)
         thread.start()
 
@@ -890,10 +895,12 @@ class VideoStream(QWidget):
     def _stream_started(self):
         self.btn_start.setEnabled(False)
         self.btn_stop.setEnabled(True)
+        self.cb_save_video.setEnabled(False)
 
     def _reset(self):
         self.btn_start.setEnabled(True)
         self.btn_stop.setEnabled(False)
+        self.cb_save_video.setEnabled(True)
 
     def set_visible(self, value: bool) -> None:
         self._is_visible = value
