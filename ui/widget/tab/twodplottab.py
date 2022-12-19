@@ -2,7 +2,7 @@ import pandas as pd
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QGridLayout, QWidget, QScrollArea, QHBoxLayout
 
-from log import DroneExtraLog
+from general.debug import DroneExtraLog
 from ui.widget.canvas import CanvasWidget, FigureType
 from ui.widget.tab.tab import Tab
 

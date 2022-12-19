@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import time
+from datetime import datetime
 import traceback
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -190,8 +191,9 @@ class Motion:
             (other.yaw if isinstance(other, Motion) else 0)
         )
 
-    def to_csv(self):
-        return f"{self.vx:.3f},{self.vy:.3f},{self.vz:.3f},{self.yaw:.3f}"
+    def to_csv(self, escape: bool = False):
+        return f"{self.vx:.3f},{self.vy:.3f},{self.vz:.3f},{self.yaw:.3f}" if not escape else \
+            f'"({self.vx:.3f},{self.vy:.3f},{self.vz:.3f},{self.yaw:.3f})"'
 
     def __str__(self):
         return f"({self.vx:.3f}, {self.vy:.3f}, {self.vz:.3f}, {self.yaw:.3f})"
@@ -1258,7 +1260,7 @@ class FlyControlThread(Thread):
                         self.setting.fly_mode.set(FlyMode.HOVER)
 
                 if self.fly_status == FlyStatus.TAKING_OFF:
-                    self._extra_log[DroneExtraLog.Flag.MODE] = 'Taking Off'
+                    self._extra_log[DroneExtraLog.MODE] = 'Taking Off'
                     current_position = self._drone_state.position
                     if current_position.z < self.setting.distance.take_off_height.get():
                         motion = self.get_hover_velocity(self.hover_position,
@@ -1270,7 +1272,7 @@ class FlyControlThread(Thread):
                         self._fly_control.take_off_cb.call()
 
                 elif self.fly_status == FlyStatus.LANDING:
-                    self._extra_log[DroneExtraLog.Flag.MODE] = 'Landing'
+                    self._extra_log[DroneExtraLog.MODE] = 'Landing'
                     current_position = self._drone_state.position
 
                     cur_time = time.perf_counter()
@@ -1625,7 +1627,7 @@ class FlyControlThread(Thread):
             return motion
 
         distance = distance if l == GDirection.WEST else -distance
-        self._extra_log[DroneExtraLog.Flag.MAINTAIN_DIRECTION_OFFSET] = distance
+        self._extra_log[DroneExtraLog.MAINTAIN_DIRECTION_OFFSET] = distance
 
         correction = Motion(0, round(velocity, 2), 0, 0) + motion
         return correction
@@ -1876,7 +1878,7 @@ class FlyControlThread(Thread):
             # self.go_to_set_axis_changing()
             LOGGER.debug(f"Require axis change to {self._go_to_helper.moving_direction.axis}")
             self._change_to_hold(next_action=GoToAction.AXIS_CHANGING, hold_position=current_pos)
-        self._extra_log[DroneExtraLog.Flag.GO_TO_MODE] = self._go_to_helper.action.name
+        self._extra_log[DroneExtraLog.GO_TO_MODE] = self._go_to_helper.action.name
 
         if self._go_to_helper.action == GoToAction.HOLD:
             if 'go_to_hold_reach' not in self._position_buffer_dict:
@@ -1903,12 +1905,12 @@ class FlyControlThread(Thread):
                     velocity=self.setting.velocity.hold_correction_velocity.get()
                 )
                 motion = motion + correction
-                self._extra_log[DroneExtraLog.Flag.HOLD_POS] = self._go_to_helper.hold_position
-                self._extra_log[DroneExtraLog.Flag.HOLD_CORRECTION] = correction
+                self._extra_log[DroneExtraLog.HOLD_POS] = self._go_to_helper.hold_position.to_csv(escape=True)
+                self._extra_log[DroneExtraLog.HOLD_CORRECTION] = correction.to_csv(escape=True)
 
         elif self._go_to_helper.action == GoToAction.AXIS_CHANGING:
-            self._extra_log[DroneExtraLog.Flag.AXIS_CHANGE_TO] = str(self._go_to_helper.moving_direction.axis)
-            self._extra_log[DroneExtraLog.Flag.HOLD_POS] = self._go_to_helper.hold_position
+            self._extra_log[DroneExtraLog.AXIS_CHANGE_TO] = str(self._go_to_helper.moving_direction.axis)
+            self._extra_log[DroneExtraLog.HOLD_POS] = self._go_to_helper.hold_position.to_csv(escape=True)
 
             motion = self.get_hover_velocity(
                 target=self._go_to_helper.hold_position,
@@ -1952,8 +1954,8 @@ class FlyControlThread(Thread):
                         dist_to_target_abs.x,
                         max_value=slow_dist,
                         min_value=0)
-                    self._extra_log[DroneExtraLog.Flag.CURRENT_AXIS] = 'X'
-                    self._extra_log[DroneExtraLog.Flag.DISTANCE_TO_TARGET] = dist_to_target.x
+                    self._extra_log[DroneExtraLog.CURRENT_AXIS] = 'X'
+                    self._extra_log[DroneExtraLog.DISTANCE_TO_TARGET] = dist_to_target.x
 
                 # Moving alone with Y axis
                 else:
@@ -1962,10 +1964,10 @@ class FlyControlThread(Thread):
                         max_value=slow_dist,
                         min_value=0)
 
-                    self._extra_log[DroneExtraLog.Flag.CURRENT_AXIS] = 'Y'
-                    self._extra_log[DroneExtraLog.Flag.DISTANCE_TO_TARGET] = dist_to_target.y
+                    self._extra_log[DroneExtraLog.CURRENT_AXIS] = 'Y'
+                    self._extra_log[DroneExtraLog.DISTANCE_TO_TARGET] = dist_to_target.y
 
-                self._extra_log[DroneExtraLog.Flag.THRUST_PERCENT] = thrust_percent
+                self._extra_log[DroneExtraLog.THRUST_PERCENT] = thrust_percent
 
                 if thrust_percent < 0.01 or self._is_pass_target(
                         self._go_to_helper.moving_direction, self._drone_state.position,
@@ -1980,10 +1982,10 @@ class FlyControlThread(Thread):
                     thrust_percent = max(thrust_percent, 0.3)
                     vx = velocity.vy * thrust_percent
                     motion.vx = vx
-                    self._extra_log[DroneExtraLog.Flag.THRUST_PERCENT] = thrust_percent
+                    self._extra_log[DroneExtraLog.THRUST_PERCENT] = thrust_percent
             else:  # avoiding the obstacle
-                self._extra_log[DroneExtraLog.Flag.AVOIDING_OBSTACLE] = True
-                self._extra_log[DroneExtraLog.Flag.OBSTACLE_DIRECTION] = self._go_to_helper.obstacle_direction.name
+                self._extra_log[DroneExtraLog.AVOIDING_OBSTACLE] = True
+                self._extra_log[DroneExtraLog.OBSTACLE_DIRECTION] = self._go_to_helper.obstacle_direction.name
 
                 if self._go_to_helper.avoiding_obstacle_special_position is not None:
                     if not is_behind_me(self._drone_state.position, self._go_to_helper.avoiding_obstacle_special_position,
@@ -1998,7 +2000,7 @@ class FlyControlThread(Thread):
 
                 # cur_direction = AxisDirection.from_yaw(current_yaw)
                 self._obstacle_avoidance_buffer.append(monitor_dist)
-                self._extra_log[DroneExtraLog.Flag.OBSTACLE_DISTANCE_AVG] = self._obstacle_avoidance_buffer.avg()
+                self._extra_log[DroneExtraLog.OBSTACLE_DISTANCE_AVG] = self._obstacle_avoidance_buffer.avg()
 
                 if self._obstacle_avoidance_buffer.is_full and \
                         self._obstacle_avoidance_buffer.avg() > self.setting.distance.moving_side_maintain_distance.get() + \
@@ -2238,23 +2240,23 @@ class FlyControlThread(Thread):
     def _dump_flight_data(self, motion: Motion):
         if not self._dump_flight_data_file:
             return
-        cur_time = time.strftime("%H:%M:%S.%f")
+        cur_time = datetime.now().strftime("%H:%M:%S.%f")
         state_data = self._drone_state.to_csv()
-        extra = "{}"
-        try:
-            for key, value in self._extra_log.items():
-                if isinstance(value, (int, float)):
-                    self._extra_log[key] = round(value, 3)
-            extra = dict_to_json_escape_csv(self._extra_log)
-        except Exception as e:
-            LOGGER.debug(f'Error when dumping extra data: {self._extra_log}')
+        # extra = "{}"
+        # try:
+        #     for key, value in self._extra_log.items():
+        #         if isinstance(value, (int, float)):
+        #             self._extra_log[key] = round(value, 3)
+        #     extra = dict_to_json_escape_csv(self._extra_log)
+        # except Exception as e:
+        #     LOGGER.debug(f'Error when dumping extra data: {self._extra_log}')
         data = f'{cur_time},' \
                f'{state_data},' \
                f'{motion.to_csv()},' \
                f'{self.setting.hover_position.get().to_csv()},' \
                f'{self.setting.fly_mode.get()},' \
                f'"{self._current_command}",' \
-               f'"{extra}"'
+               f'{DroneExtraLog.convert_dict_to_csv(self._extra_log)}'
         print(data, file=self._dump_flight_data_file)
 
     def set_land_timeout(self, timeout: float):

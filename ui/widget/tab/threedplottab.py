@@ -7,7 +7,8 @@ from pandas import DataFrame
 
 from general.utils import df_to_list
 from hub.drone import GoToAction, FlyMode
-from log import LogVariable, DroneExtraLog
+from log import LogVariable
+from general.debug import DroneExtraLog
 from ui.widget.canvas import Canvas3D
 from ui.widget.canvas import Canvas3DVispy, VispyMarker
 from ui.widget.color import VispyColor, Color

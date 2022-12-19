@@ -123,11 +123,11 @@ class Position:
             return Position(self.x + other, self.y + other, self.z + other)
         return Position(self.x + other.x, self.y + other.y, self.z + other.z)
 
-    def to_csv(self):
+    def to_csv(self, escape: bool = False):
         x = f'{self.x:.3f}' if self.x is not None else 'None'
         y = f'{self.y:.3f}' if self.y is not None else 'None'
         z = f'{self.z:.3f}' if self.z is not None else 'None'
-        return f'{x},{y},{z}'
+        return f'{x},{y},{z}' if not escape else f'"({x},{y},{z})"'
 
     def to_tuple(self):
         return self.x, self.y, self.z
