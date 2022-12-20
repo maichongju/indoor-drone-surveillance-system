@@ -35,11 +35,14 @@ class Position:
     def from_tuple(position: Tuple[float, float, float]) -> Position:
         return Position(position[0], position[1], position[2])
 
-    def distance(self, other: Position) -> float:
+    def distance(self, other: Position, ignore_z: bool = False) -> float:
         if not isinstance(other, Position):
             raise TypeError('other must be Position')
         diff = self - other
-        distance = (diff.x ** 2 + diff.y ** 2 + diff.z ** 2) ** 0.5
+        if not ignore_z:
+            distance = (diff.x ** 2 + diff.y ** 2 + diff.z ** 2) ** 0.5
+        else:
+            distance = (diff.x ** 2 + diff.y ** 2) ** 0.5
         return distance
 
     def round(self, decimal: int = 2):

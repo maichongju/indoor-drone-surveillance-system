@@ -28,7 +28,7 @@ class Path:
             raise TypeError('point must be Position')
         self._positions.append(point.copy())
 
-    def insert_position(self, index:int, position: Position):
+    def insert_position(self, index: int, position: Position):
         """
         Insert a position in the given position
         Args:
@@ -38,7 +38,8 @@ class Path:
         self._positions.insert(index, position)
 
     def get_next_position(self) -> Position | None:
-        """ Get the next point in the path. If there is no next point, `None` is returned. 
+        """ Get the next point in the path. If there is no next point, `None` is returned.
+        Should call `set_first_position` before calling this function. Otherwise, this first point will be returned.
         """
         if self._current >= len(self._positions):
             if self.connected:
@@ -49,6 +50,22 @@ class Path:
         point = self._positions[self._current]
         self._current += 1
         return point
+
+    def set_first_position(self, cur_pos: Position):
+        """
+        Compare all the set points in the path with the current position and set the first point as the closest point
+        to the current position
+        Args:
+            cur_pos: current position of the drone
+        """
+        assert len(self._positions) > 0, 'Path is empty'
+        self._current = 0
+        min_dist = float('inf')
+        for i, pos in enumerate(self._positions): # type: int, Position
+            dist = pos.distance(cur_pos,ignore_z=True)
+            if dist < min_dist:
+                min_dist = dist
+                self._current = i
 
     def replace_pos_all(self, pos: list[Position]):
         """

@@ -1242,6 +1242,7 @@ class FlyControlThread(Thread):
                 elif isinstance(command, Path):
                     if not command.is_empty():
                         self._path = command
+                        self._path.set_first_position(self._drone_state.position)
                         self._current_command = self._path.get_next_position()
                         self.setting.fly_mode.set(FlyMode.TARGET)
                         self._go_to_helper.reset()
