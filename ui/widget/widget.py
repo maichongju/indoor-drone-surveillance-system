@@ -616,3 +616,26 @@ class PathEditWidget(QWidget):
     def save(self):
         self.path_detail.apply_change()
         self._set_path_detail_is_updated(False)
+
+
+class CircleLabelWidget(QWidget):
+    def __init__(self,
+                 text: str,
+                 radius: int = 30,
+                 border_width: float = 1,
+                 border_color: str = '#000000',
+                 background_color: str = '#0000ff',
+                 ):
+        super().__init__()
+
+        layout = QHBoxLayout()
+        self.setLayout(layout)
+        circle = QLabel()
+        circle.setFixedSize(radius * 2, radius * 2)
+        circle.setStyleSheet(f"border-radius: {radius}px; " +
+                             f"border: {border_width}px solid {border_color}; " +
+                             f"background-color: {background_color};")
+        layout.addWidget(circle)
+
+        text_label = QLabel(text)
+        layout.addWidget(text_label)

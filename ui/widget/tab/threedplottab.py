@@ -13,6 +13,7 @@ from ui.widget.canvas import Canvas3D
 from ui.widget.canvas import Canvas3DVispy, VispyMarker
 from ui.widget.color import VispyColor, Color
 from ui.widget.tab.tab import Tab
+from ui.widget.widget import CircleLabelWidget
 
 # from hub import Hub
 
@@ -69,16 +70,16 @@ class ThreeDPlotTab(Tab):
         self.file_name = file_name
 
 
-COLOR_GO_TO_MOVING = VispyColor.get_color(Color.ANDROID_GREEN)
-COLOR_GO_TO_HOLD = VispyColor.get_color(Color.BEE_YELLOW)
-COLOR_GO_TO_AXIS_CHANGING = VispyColor.get_color(Color.BRILLIANT_ROSE)
+COLOR_GO_TO_MOVING = Color.ANDROID_GREEN
+COLOR_GO_TO_HOLD = Color.BEE_YELLOW
+COLOR_GO_TO_AXIS_CHANGING = Color.BRILLIANT_ROSE
 
 
 class ThreeDPlotVispyTab(Tab):
     def __init__(self, parent=None):
         super().__init__('3D Plot', parent=parent)
         self.file_name = None
-        self.setFixedSize(800, 600)
+        self.setFixedSize(1000, 600)
         self._setup_ui()
         self._markers = {
             FlyMode.TARGET.name: {}
@@ -87,8 +88,26 @@ class ThreeDPlotVispyTab(Tab):
     def _setup_ui(self):
         self.canvas = Canvas3DVispy()
         layout = QHBoxLayout(self)
+
         layout.addWidget(self.canvas.native)
         self.setLayout(layout)
+
+        right_layout = QVBoxLayout()
+        layout.addLayout(right_layout)
+
+        go_to_moving_hint = CircleLabelWidget(text='Go to Moving',
+                                              radius=5,
+                                              background_color=COLOR_GO_TO_MOVING.hex)
+        right_layout.addWidget(go_to_moving_hint)
+        go_to_hold = CircleLabelWidget(text='Go to Hold',
+                                       radius=5,
+                                       background_color=COLOR_GO_TO_HOLD.hex)
+        right_layout.addWidget(go_to_hold)
+        go_to_axis_changing_hint = CircleLabelWidget(text='Go to Moving',
+                                                     radius=5,
+                                                     background_color=COLOR_GO_TO_AXIS_CHANGING.hex)
+        right_layout.addWidget(go_to_axis_changing_hint)
+        right_layout.addStretch()
 
     def clear(self):
         for marker in self._markers.values():  # type: str, VispyMarker
@@ -150,13 +169,17 @@ class ThreeDPlotVispyTab(Tab):
                         match action:
                             case GoToAction.HOLD.name:
                                 self._markers[mode][action] = self.canvas.plot_scatter(coord,
-                                                                                       {'face_color': COLOR_GO_TO_HOLD})
+                                                                                       {
+                                                                                           'face_color': VispyColor.get_color(
+                                                                                               COLOR_GO_TO_HOLD)})
                             case GoToAction.MOVING.name:
                                 self._markers[mode][action] = self.canvas.plot_scatter(coord,
-                                                                                       {'face_color': COLOR_GO_TO_MOVING})
+                                                                                       {
+                                                                                           'face_color': VispyColor.get_color(
+                                                                                               COLOR_GO_TO_MOVING)})
                             case GoToAction.AXIS_CHANGING.name:
                                 self._markers[mode][action] = self.canvas.plot_scatter(coord, {
-                                    'face_color': COLOR_GO_TO_AXIS_CHANGING})
+                                    'face_color': VispyColor.get_color(COLOR_GO_TO_AXIS_CHANGING)})
             else:
                 self._markers[mode] = self.canvas.plot_scatter(data)
 
