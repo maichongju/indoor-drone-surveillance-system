@@ -167,7 +167,7 @@ class ThreeDPlotVispyTab(Tab):
         for row in zip(*data):
             x, y, z, mode = row[:4]
             go_to_mode = row[4] if not backward_capable else row[4].get(DroneExtraLog.GO_TO_MODE.value, None)
-            status = row[5] if not backward_capable else row[5].get(DroneExtraLog.STATUS.value, None)
+            status = row[5] if not backward_capable else row[4].get('mode', None)
 
             if mode not in temp_dict:
                 temp_dict[mode] = [[], [], []]
