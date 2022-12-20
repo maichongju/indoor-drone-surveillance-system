@@ -1260,7 +1260,7 @@ class FlyControlThread(Thread):
                         self.setting.fly_mode.set(FlyMode.HOVER)
 
                 if self.fly_status == FlyStatus.TAKING_OFF:
-                    self._extra_log[DroneExtraLog.MODE] = 'Taking Off'
+                    self._extra_log[DroneExtraLog.STATUS] = 'Taking Off'
                     current_position = self._drone_state.position
                     if current_position.z < self.setting.distance.take_off_height.get():
                         motion = self.get_hover_velocity(self.hover_position,
@@ -1272,7 +1272,7 @@ class FlyControlThread(Thread):
                         self._fly_control.take_off_cb.call()
 
                 elif self.fly_status == FlyStatus.LANDING:
-                    self._extra_log[DroneExtraLog.MODE] = 'Landing'
+                    self._extra_log[DroneExtraLog.STATUS] = 'Landing'
                     current_position = self._drone_state.position
 
                     cur_time = time.perf_counter()

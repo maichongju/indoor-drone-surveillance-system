@@ -49,6 +49,7 @@ class TwoDPlotTab(Tab):
 
     def plot(self, df: pd.DataFrame, file_name: str):
         size = len(df.index)
+        backward_capable = True if 'extra' in df else False
 
         # Height plot
         height_data = df['stateEstimate.z'].to_list()
@@ -82,8 +83,12 @@ class TwoDPlotTab(Tab):
 
         # Moving Direction Drift Plot
         drift_data = []
-        for log in df['extra'].to_list():  # type: dict
-            drift_data.append(log.get(DroneExtraLog.MAINTAIN_DIRECTION_OFFSET, 0))
+        if backward_capable:
+            for log in df['extra'].to_list():  # type: dict
+                drift_data.append(log.get(DroneExtraLog.MAINTAIN_DIRECTION_OFFSET, 0))
+        else:
+            for log in df[DroneExtraLog.MAINTAIN_DIRECTION_OFFSET].to_list():
+                drift_data.append(log)
 
         self.moving_direction_drift_canvas.plot(drift_data, file_name=file_name)
 

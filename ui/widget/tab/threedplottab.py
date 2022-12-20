@@ -99,16 +99,6 @@ class ThreeDPlotVispyTab(Tab):
                     marker2.clear()
 
     def plot(self, df: DataFrame, file_name):
-        headers = [
-            LogVariable.POSITION_X.name,
-            LogVariable.POSITION_Y.name,
-            LogVariable.POSITION_Z.name,
-            'mode',
-            'extra',
-        ]
-
-        data = df_to_list(df, headers)
-
         temp_dict = {
             FlyMode.TARGET.name: {
                 GoToAction.HOLD.name: [[], [], []],
@@ -116,12 +106,34 @@ class ThreeDPlotVispyTab(Tab):
                 GoToAction.AXIS_CHANGING.name: [[], [], []],
             }
         }
+
+        backward_capable = True if 'extra' in df else False
+        if backward_capable:
+            headers = [
+                LogVariable.POSITION_X.name,
+                LogVariable.POSITION_Y.name,
+                LogVariable.POSITION_Z.name,
+                'mode',
+                'extra',
+            ]
+        else:
+            headers = [
+                LogVariable.POSITION_X.name,
+                LogVariable.POSITION_Y.name,
+                LogVariable.POSITION_Z.name,
+                'mode',
+                DroneExtraLog.GO_TO_MODE.value,
+            ]
+
+        data = df_to_list(df, headers)
+
         for x, y, z, mode, extra in zip(*data):
             if mode not in temp_dict:
                 temp_dict[mode] = [[], [], []]
 
             if mode == FlyMode.TARGET.name:
-                match extra.get(DroneExtraLog.GO_TO_MODE.value, None):
+                go_to_mode = extra.get(DroneExtraLog.GO_TO_MODE.value, None) if backward_capable else extra
+                match go_to_mode:
                     case GoToAction.HOLD.name:
                         self.add_xyz_to_list(x, y, z, temp_dict[mode][GoToAction.HOLD.name])
                     case GoToAction.MOVING.name:

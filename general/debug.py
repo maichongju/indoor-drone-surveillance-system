@@ -44,7 +44,7 @@ def get_dump_flight_data_file(state: DroneInfo, uri: str, prefix: str = None, fo
 #     OBSTACLE_DISTANCE_AVG = 'obstacle_distance_avg'
 
 class DroneExtraLog(str, Enum):
-    MODE = 'mode'
+    STATUS = 'status'
     HOLD_POS = 'hold_pos'
     HOLD_CORRECTION = 'hold_correction'
     CORRECTION = 'correction'

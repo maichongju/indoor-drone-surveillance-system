@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QFil
 
 import traceback
 import pandas as pd
+from general.debug import DroneExtraLog
 
 EXPORT_FOLDER = 'export'
 
@@ -66,7 +67,13 @@ class FlightDataWindow(QWidget):
             df['hover.x'] = df['hover.x'].replace({'None': None}).astype(float)
             df['hover.y'] = df['hover.y'].replace({'None': None}).astype(float)
             df['hover.z'] = df['hover.z'].replace({'None': None}).astype(float)
-            df['extra'] = df['extra'].apply(self.process_extra_log)
+
+            if 'extra' in df:  # backward compatibility
+                df['extra'] = df['extra'].apply(self.process_extra_log)
+            else:  # newer version
+                df[DroneExtraLog.MAINTAIN_DIRECTION_OFFSET] = \
+                    df[DroneExtraLog.MAINTAIN_DIRECTION_OFFSET].replace({'None': None}).astype(float)
+
             self.tab_3d.plot(df, file_name)
             self.tab_2d.plot(df, file_name)
         except Exception as e:
