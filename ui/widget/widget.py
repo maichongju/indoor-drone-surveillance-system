@@ -621,7 +621,7 @@ class PathEditWidget(QWidget):
 class CircleLabelWidget(QWidget):
     def __init__(self,
                  text: str,
-                 radius: int = 30,
+                 radius: int = 5,
                  border_width: float = 1,
                  border_color: str = '#000000',
                  background_color: str = '#0000ff',

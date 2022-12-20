@@ -74,6 +74,9 @@ class ThreeDPlotTab(Tab):
 COLOR_GO_TO_MOVING = Color.ANDROID_GREEN
 COLOR_GO_TO_HOLD = Color.BEE_YELLOW
 COLOR_GO_TO_AXIS_CHANGING = Color.BRILLIANT_ROSE
+COLOR_TAKE_OFF = Color.PEARL_COPPER
+COLOR_LAND = Color.ZINC_YELLOW
+COLOR_HOVER = Color.PINK
 
 
 class ThreeDPlotVispyTab(Tab):
@@ -97,17 +100,27 @@ class ThreeDPlotVispyTab(Tab):
         layout.addLayout(right_layout)
 
         go_to_moving_hint = CircleLabelWidget(text='Go to Moving',
-                                              radius=5,
                                               background_color=COLOR_GO_TO_MOVING.hex)
         right_layout.addWidget(go_to_moving_hint)
         go_to_hold = CircleLabelWidget(text='Go to Hold',
-                                       radius=5,
                                        background_color=COLOR_GO_TO_HOLD.hex)
         right_layout.addWidget(go_to_hold)
-        go_to_axis_changing_hint = CircleLabelWidget(text='Go to Moving',
-                                                     radius=5,
+        go_to_axis_changing_hint = CircleLabelWidget(text='Change Axis',
                                                      background_color=COLOR_GO_TO_AXIS_CHANGING.hex)
         right_layout.addWidget(go_to_axis_changing_hint)
+
+        take_off_hint = CircleLabelWidget(text='Take Off',
+                                          background_color=COLOR_TAKE_OFF.hex)
+        right_layout.addWidget(take_off_hint)
+
+        land_hint = CircleLabelWidget(text='Land',
+                                      background_color=COLOR_LAND.hex)
+        right_layout.addWidget(land_hint)
+
+        hover_hint = CircleLabelWidget(text='Hover',
+                                       background_color=COLOR_HOVER.hex)
+        right_layout.addWidget(hover_hint)
+
         right_layout.addStretch()
 
     def clear(self):
@@ -124,7 +137,9 @@ class ThreeDPlotVispyTab(Tab):
                 GoToAction.HOLD.name: [[], [], []],
                 GoToAction.MOVING.name: [[], [], []],
                 GoToAction.AXIS_CHANGING.name: [[], [], []],
-            }
+            },
+            'Taking Off': [[], [], []],
+            'Landing': [[], [], []],
         }
 
         backward_capable = True if 'extra' in df else False
@@ -142,17 +157,26 @@ class ThreeDPlotVispyTab(Tab):
                 LogVariable.POSITION_Y.name,
                 LogVariable.POSITION_Z.name,
                 'mode',
-                DroneExtraLog.GO_TO_MODE.value,
+                DroneExtraLog.GO_TO_MODE,
+                DroneExtraLog.STATUS
             ]
 
         data = df_to_list(df, headers)
 
-        for x, y, z, mode, extra in zip(*data):
+        # for x, y, z, mode, extra in zip(*data):
+        for row in zip(*data):
+            x, y, z, mode = row[:4]
+            go_to_mode = row[4] if not backward_capable else row[4].get(DroneExtraLog.GO_TO_MODE.value, None)
+            status = row[5] if not backward_capable else row[5].get(DroneExtraLog.STATUS.value, None)
+
             if mode not in temp_dict:
                 temp_dict[mode] = [[], [], []]
 
-            if mode == FlyMode.TARGET.name:
-                go_to_mode = extra.get(DroneExtraLog.GO_TO_MODE.value, None) if backward_capable else extra
+            if status == 'Taking Off':
+                self.add_xyz_to_list(x, y, z, temp_dict['Taking Off'])
+            elif status == 'Landing':
+                self.add_xyz_to_list(x, y, z, temp_dict['Landing'])
+            elif mode == FlyMode.TARGET.name:
                 match go_to_mode:
                     case GoToAction.HOLD.name:
                         self.add_xyz_to_list(x, y, z, temp_dict[mode][GoToAction.HOLD.name])
@@ -182,7 +206,16 @@ class ThreeDPlotVispyTab(Tab):
                                 self._markers[mode][action] = self.canvas.plot_scatter(coord, {
                                     'face_color': VispyColor.get_color(COLOR_GO_TO_AXIS_CHANGING)})
             else:
-                self._markers[mode] = self.canvas.plot_scatter(data)
+                if len(data[0]) > 0:
+                    if mode == 'Taking Off':
+                        setting = {'face_color': VispyColor.get_color(COLOR_TAKE_OFF)}
+                    elif mode == 'Landing':
+                        setting = {'face_color': VispyColor.get_color(COLOR_LAND)}
+                    elif mode.lower() == 'hover':
+                        setting = {'face_color': VispyColor.get_color(COLOR_HOVER)}
+                    else:
+                        setting = {}
+                    self._markers[mode] = self.canvas.plot_scatter(data, setting=setting)
 
     def add_xyz_to_list(self, x: float, y: float, z: float, target: list):
         target[0].append(x)

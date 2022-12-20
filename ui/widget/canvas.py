@@ -240,7 +240,8 @@ DEFAULT_END_POINT_SETTING = {
 }
 
 DEFAULT_MARKER_SETTING = {
-    'size': 5,
+    'size': 8,
+    'edge_width': 1
 }
 
 DEFAULT_TEXT_SETTING = {
