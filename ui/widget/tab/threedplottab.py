@@ -62,6 +62,7 @@ class ThreeDPlotTab(Tab):
         self.file_name = None
 
     def plot(self, df: pd.DataFrame, file_name: str):
+        self.clear()
         cols = ['stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z']
         values = []
         for col in cols:
