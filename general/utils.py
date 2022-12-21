@@ -287,6 +287,7 @@ class Axis(Enum):
         else:
             return Axis.Z
 
+
 class Direction(IntEnum):
     """Direction of the axis
     """
@@ -612,3 +613,16 @@ def is_behind_me(current: Position, target: Position, direction: AxisDirection) 
             return dist.y > 0
         else:
             return dist.y < 0
+
+
+def insert_list_to_list(origin_list: list, insert_list: list, index: int):
+    """
+    Insert the insert_list to the origin_list at the given index
+    Examples:
+    >>> origin_list = [1,2,3,4]
+    >>> insert_list = [5,6]
+    >>> insert_list_to_list(origin_list, insert_list, 2)
+    >>> origin_list
+    [1,2,5,6,3,4]
+    """
+    origin_list[index:index] = insert_list

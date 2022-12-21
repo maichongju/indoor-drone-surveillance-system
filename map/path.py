@@ -7,6 +7,9 @@ import jsonpickle
 
 from general.utils import Position
 from log.logger import LOGGER
+import general.utils as utils
+
+from general.utils import Axis, GDirection
 
 
 class Path:
@@ -28,6 +31,32 @@ class Path:
             raise TypeError('point must be Position')
         self._positions.append(point.copy())
 
+    def add_positions_to_current(self, positions: list[Position]):
+        """
+        Add the given positions to the curren path. The given positions will be clean up first
+        """
+        start_pos = self._positions[(self._current - 1) % len(self._positions)]
+        end_pos = self._positions[self._current]
+
+        relevant_direction = utils.point_relevant_location(start_pos, end_pos)
+        facing_direction = Axis.X if relevant_direction[0] == GDirection.SAME else Axis.Y
+
+        setpoints = []
+        cur = start_pos
+
+        # Clean up the positions
+        for pos in positions:
+            if facing_direction == Axis.X:
+                new_pos = Position(pos.x, cur.y, cur.z)
+            else:
+                new_pos = Position(cur.x, pos.y, cur.z)
+            setpoints.append(new_pos)
+            cur = new_pos
+            facing_direction = Axis.X if facing_direction == Axis.Y else Axis.Y
+
+        utils.insert_list_to_list(self._positions, setpoints, self._current)
+        self._current += len(setpoints)
+
     def insert_position(self, index: int, position: Position):
         """
         Insert a position in the given position
@@ -41,15 +70,15 @@ class Path:
         """ Get the next point in the path. If there is no next point, `None` is returned.
         Should call `set_first_position` before calling this function. Otherwise, this first point will be returned.
         """
+        self._current += 1
+
         if self._current >= len(self._positions):
             if self.connected:
                 self._current = 0
             else:
                 return None
-            self._current = 0
-        point = self._positions[self._current]
-        self._current += 1
-        return point
+
+        return self._positions[self._current]
 
     def set_first_position(self, cur_pos: Position):
         """
@@ -61,8 +90,8 @@ class Path:
         assert len(self._positions) > 0, 'Path is empty'
         self._current = 0
         min_dist = float('inf')
-        for i, pos in enumerate(self._positions): # type: int, Position
-            dist = pos.distance(cur_pos,ignore_z=True)
+        for i, pos in enumerate(self._positions):  # type: int, Position
+            dist = pos.distance(cur_pos, ignore_z=True)
             if dist < min_dist:
                 min_dist = dist
                 self._current = i
@@ -142,6 +171,9 @@ class Path:
             return False
 
         return True
+
+    def __str__(self):
+        return f'Path: {self.name}, {self._positions}'
 
 
 class PathList:

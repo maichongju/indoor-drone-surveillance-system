@@ -1137,6 +1137,8 @@ class FlyControlGoToHelper:
 
     target_yaw: float | None = None
 
+    detour_path: List[Position] = field(default_factory=list)
+
     def reset(self):
         self.moving_direction.axis = Axis.Y
         self.action = GoToAction.REQUIRE_INIT
@@ -1153,6 +1155,7 @@ class FlyControlThread(Thread):
 
     def __init__(self, drone: Drone):
         super().__init__()
+
         self._extra_log = {}
         self._drone = drone
         self._commander = drone._scf.cf.commander
@@ -1247,6 +1250,7 @@ class FlyControlThread(Thread):
                         self.setting.fly_mode.set(FlyMode.TARGET)
                         self._go_to_helper.reset()
                         self._go_to_helper.target_position = self._current_command
+                        self._go_to_helper.detour_path = []
 
                 elif isinstance(command, Motion):
                     motion = command
@@ -1819,6 +1823,12 @@ class FlyControlThread(Thread):
 
             # Check if currently is in path mode
             if self._path is not None:
+                if len(self._go_to_helper.detour_path) > 0:
+                    LOGGER.info(f"Detour path found!")
+                    LOGGER.debug(f"Detour path: {self._go_to_helper.detour_path}")
+                    self._path.add_positions_to_current(self._go_to_helper.detour_path)
+                    LOGGER.debug(f"New Path: {self._path}")
+
                 next_position = self._path.get_next_position()
                 if next_position is not None:
                     self._go_to_helper.reset()
@@ -1945,6 +1955,7 @@ class FlyControlThread(Thread):
             if self._drone_state.front_distance < turn_trigger_distance.x:
                 self._go_to_helper.action = GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE
                 LOGGER.debug(f"Obstacle detected, change direction (front:{self._drone_state.front_distance})")
+                self._go_to_helper.detour_path.append(self._drone_state.position)
                 return motion
             slow_dist: float = self.setting.distance.auto_slow_distance.get()
             if not self._go_to_helper.avoiding_obstacle:  # Normal move
@@ -1978,6 +1989,7 @@ class FlyControlThread(Thread):
                     self._change_to_hold(hold_position=hover_pos,
                                          next_action=GoToAction.REQUIRE_AXIS_CHANGE)
                     LOGGER.debug(f'Reach current axis. Change to hold. (hover_pos: {hover_pos})')
+                    self._go_to_helper.detour_path.append(hover_pos)
 
                 else:
                     thrust_percent = max(thrust_percent, 0.3)
@@ -2028,6 +2040,7 @@ class FlyControlThread(Thread):
                         self.setting.distance.moving_side_maintain_distance.get())
                     self._change_to_hold(next_action=GoToAction.AXIS_CHANGING, hold_position=hold_pos)
                     motion = motion.zero()
+                    self._go_to_helper.detour_path.append(hold_pos)
 
                     if not self._is_target_same_side_obstacle():
                         self._go_to_helper.avoiding_obstacle = False
