@@ -37,6 +37,9 @@ class Queue:
     def is_empty(self):
         return len(self._queue) == 0
 
+    def clear(self):
+        self._queue.clear()
+
 
 class PriorityQueue(Queue):
     """
@@ -86,3 +89,7 @@ class PriorityQueue(Queue):
             self._priority_index = -1
         else:
             self._priority_index = self._queue.index(min(self._queue))
+
+    def clear(self):
+        super().clear()
+        self._priority_index = -1

@@ -7,7 +7,7 @@ import traceback
 from dataclasses import dataclass, field
 from datetime import datetime
 from logging import Logger
-from queue import Empty, Queue
+from general.queue import PriorityQueue, Empty
 from threading import Event, Thread
 from typing import Any
 
@@ -142,7 +142,10 @@ class ControlQueueCommand:
         return self.priority > other.priority
 
     def __eq__(self, other):
-        return self.priority == other.priority
+        return self.priority == other.priority and self.data == other.data
+
+    def __ne__(self, other):
+        return self.priority != other.priority or self.data != other.data
 
     def __le__(self, other):
         return self.priority <= other.priority
@@ -1095,7 +1098,7 @@ class FlyControl:
                 f'[Fly Control] {self._drone.name} is not in debug mode')
             return
         if self._control_thread is not None:
-            self._control_thread.add_command(command)
+            self._control_thread.add_command(command, debug=True)
 
     # Debug end
 
@@ -1215,7 +1218,7 @@ class FlyControlThread(Thread):
         self._fly_control = drone.fly_control
 
         self._drone_state = self._drone.state
-        self._control_queue = Queue()
+        self._control_queue = PriorityQueue()
         self._created_time = datetime.now()
 
         # Credit motion_commander from cflib
@@ -1270,13 +1273,22 @@ class FlyControlThread(Thread):
                 self._extra_log = {}
                 motion = Motion()
                 # Update every 0.05 seconds
-                command = self._get_command()
 
-                if command == self.TERMINATE:
+                command: ControlQueueCommand = self._peek_command()
+                if command is not None:
+                    if self._current_command is None:
+                        self._current_command = command
+                        self._get_command()
+                    else:
+                        if command.priority > self._current_command.priority:
+                            self._current_command = command
+                            self._get_command()
+
+                if command == ControlQueueCommand.TERMINATE:
                     break
 
                 # Manually Command
-                if isinstance(command, FlyCommandManually):
+                if isinstance(command.data, FlyCommandManually):
 
                     if self.setting.control_mode.get() != FlyControlMode.MANUALLY:
                         LOGGER.debug(
@@ -1286,37 +1298,37 @@ class FlyControlThread(Thread):
                         self._current_command = command
                         self._fly_control.fly_mode = FlyMode.NORMAL
                 # Go to position command
-                elif isinstance(command, Position):  # Go to this position
+                elif isinstance(command.data, Position):  # Go to this position
                     self._current_command = command
                     self.setting.fly_mode.set(FlyMode.TARGET)
                     self._go_to_helper.reset()
                     self._go_to_helper.target_position = command
-                    self._path = self._create_path(command)
+                    self._path = self._create_path(command.data)
                     LOGGER.debug(f'Generated path: {self._path}')
 
                 # Path command
-                elif isinstance(command, Path):
-                    if not command.is_empty():
-                        self._path = command
+                elif isinstance(command.data, Path):
+                    if not command.data.is_empty():
+                        self._path = command.data
                         self._path.set_first_position(self._drone_state.position)
-                        self._current_command = self._path.get_next_position()
+                        # self._current_command = self._path.get_next_position()
                         self.setting.fly_mode.set(FlyMode.TARGET)
                         self._go_to_helper.reset()
-                        self._go_to_helper.target_position = self._current_command
+                        self._go_to_helper.target_position = self._path.get_next_position()
                         self._go_to_helper.detour_path = []
                         LOGGER.debug(f'Start Path: {self._path}')
                         LOGGER.debug(f'Start Position: {self._current_command}')
 
-                elif isinstance(command, Motion):
-                    motion = command
+                elif isinstance(command.data, Motion):
+                    motion = command.data
 
                 # Debug option:
-                elif isinstance(command, AxisDirection):
+                elif isinstance(command.data, AxisDirection):
                     if not self._drone._debug:
                         LOGGER.warn(
                             f'[Fly Control] {self._drone.name} is not in debug mode')
                     else:
-                        self._current_command = command
+                        # self._current_command = command
                         self.setting.fly_mode.set(FlyMode.HOVER)
 
                 if self.fly_status == FlyStatus.TAKING_OFF:
@@ -1358,11 +1370,11 @@ class FlyControlThread(Thread):
                     # Check manually fly time. Only process if the velocity is not 0
                     if self.setting.control_mode.get() == FlyControlMode.MANUALLY and \
                             not self.setting.manually_control_hold.get() and \
-                            (isinstance(command,
+                            (isinstance(command.data,
                                         FlyCommandManually) or self.manually_fly_time != 0):  # Ensure that there is actually some motion need to hold
 
                         motion = self._process_manually_fly_command(
-                            self._current_command)
+                            self._current_command.data)
 
                         if self.manually_fly_time == 0:
                             # Start flying. Remove all setting for hover
@@ -1386,8 +1398,8 @@ class FlyControlThread(Thread):
                     # ensure they all work perfectly
 
                     # Debug AxisDirection
-                    if isinstance(self._current_command, AxisDirection):
-                        axis: AxisDirection = self._current_command
+                    if isinstance(self._current_command.data, AxisDirection):
+                        axis: AxisDirection = self._current_command.data
                         if axis.axis == Axis.X and axis.direction == Direction.POSITIVE:
                             dist = Position(-5, 0, 0)
                         elif axis.axis == Axis.X and axis.direction == Direction.NEGATIVE:
@@ -1471,9 +1483,7 @@ class FlyControlThread(Thread):
         Args:
             no_wait (bool, optional): _description_. Defaults to False.
         """
-        if no_wait:
-            self._control_queue.queue.clear()
-        self._control_queue.put(self.TERMINATE)
+        self._control_queue.enqueue(ControlQueueCommand.TERMINATE())
 
     def _send_fly_command(self, motion: Motion):
         self._z_base = self._get_z()
@@ -1497,23 +1507,33 @@ class FlyControlThread(Thread):
         This will block for `UPDATE_PERIOD` seconds.
         """
         try:
-            return self._control_queue.get(timeout=self.UPDATE_PERIOD)
+            return self._control_queue.dequeue(time_out=self.UPDATE_PERIOD)
         except Empty:
             return None
 
-    def add_command(self, command: Motion | FlyCommandManually | AxisDirection):
+    def _peek_command(self):
+        """Return the command from the queue. If queue is empty, return None.
+        This will not block.
+        """
+        try:
+            return self._control_queue.peek(time_out=self.UPDATE_PERIOD)
+        except Empty:
+            return None
+
+    def add_command(self, command: Motion | FlyCommandManually | AxisDirection, debug: bool = False):
         """Add a new Motion to the queue.
 
         Args:
             command (FlyCommandFlag): command to be performed
         """
-        self._control_queue.put(command)
+        self._control_queue.enqueue(
+            ControlQueueCommand(command, ControlQueueCommandPriority.MEDIUM if debug else ControlQueueCommandPriority.LOW))
 
     def clear_fly_command(self):
         """
         clear all fly command in the queue
         """
-        self._control_queue.queue.clear()
+        self._control_queue.clear()
 
     def get_height(self):
         """ Get the current height of the drone
@@ -2291,7 +2311,7 @@ class FlyControlThread(Thread):
     def _create_path(self, target: Position) -> Path:
         relevant_direction = point_relevant_location(self._drone_state.position, target)
         relevant_direction = (
-        AxisDirection.from_gdirection(relevant_direction[0]), AxisDirection.from_gdirection(relevant_direction[1]))
+            AxisDirection.from_gdirection(relevant_direction[0]), AxisDirection.from_gdirection(relevant_direction[1]))
 
         distance = (
             round_up(self._drone_distance_by_direction(relevant_direction[0].rotate(self.round_yaw)), 0.05),
