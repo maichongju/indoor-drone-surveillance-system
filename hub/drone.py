@@ -9,6 +9,7 @@ from datetime import datetime
 from logging import Logger
 from queue import Empty, Queue
 from threading import Event, Thread
+from typing import Any
 
 import jsonpickle
 # Crazyflie lib
@@ -96,6 +97,58 @@ class FlyCommandManually(IntEnum):
     BACKWARD = 6
     YAW_LEFT = 7
     YAW_RIGHT = 8
+
+
+class ControlQueueCommandPriority(Enum):
+    HIGH = 1
+    MEDIUM = 2
+    LOW = 3
+
+    def __lt__(self, other):
+        return self.value < other.value
+
+    def __gt__(self, other):
+        return self.value > other.value
+
+    def __eq__(self, other):
+        return self.value == other.value
+
+    def __le__(self, other):
+        return self.value <= other.value
+
+    def __ge__(self, other):
+        return self.value >= other.value
+
+    def __ne__(self, other):
+        return self.value != other.value
+
+    def __str__(self):
+        return self.name
+
+
+@dataclass(frozen=True)
+class ControlQueueCommand:
+    data: Any
+    priority: ControlQueueCommandPriority
+
+    @staticmethod
+    def TERMINATE():
+        return ControlQueueCommand('terminate', ControlQueueCommandPriority.HIGH)
+
+    def __lt__(self, other):
+        return self.priority < other.priority
+
+    def __gt__(self, other):
+        return self.priority > other.priority
+
+    def __eq__(self, other):
+        return self.priority == other.priority
+
+    def __le__(self, other):
+        return self.priority <= other.priority
+
+    def __ge__(self, other):
+        return self.priority >= other.priority
 
 
 @dataclass
