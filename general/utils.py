@@ -196,6 +196,27 @@ class AxisDirection:
         else:
             return AxisDirection(Axis.X, Direction.NEGATIVE)
 
+    @staticmethod
+    def from_gdirection(gdirection: GDirection) -> AxisDirection:
+        match gdirection:
+            case GDirection.NORTH:
+                return AxisDirection.y_positive()
+            case GDirection.SOUTH:
+                return AxisDirection.y_negative()
+            case GDirection.EAST:
+                return AxisDirection.x_positive()
+            case GDirection.WEST:
+                return AxisDirection.x_negative()
+            case _:
+                raise ValueError(f'Invalid GDirection: {gdirection}')
+
+    def rotate(self, angle: float):
+        shift = int(angle // 90)
+        ccw = True if shift < 0 else True
+        direction = self
+        for _ in range(abs(shift)):
+            direction = direction.rotate_left() if ccw else direction.rotate_right()
+
     def rotate_right(self) -> AxisDirection:
         if not self.is_complete():
             raise ValueError('Axis and direction must be set')

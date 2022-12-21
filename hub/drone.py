@@ -40,7 +40,6 @@ from log.logger import LOGGER
 from map.path import Path
 
 
-
 class DroneException(Exception):
     pass
 
@@ -1239,7 +1238,8 @@ class FlyControlThread(Thread):
                     self.setting.fly_mode.set(FlyMode.TARGET)
                     self._go_to_helper.reset()
                     self._go_to_helper.target_position = command
-                    self._path = None
+                    self._path = self._create_path(command)
+                    LOGGER.debug(f'Generated path: {self._path}')
 
                 # Path command
                 elif isinstance(command, Path):
@@ -1251,6 +1251,8 @@ class FlyControlThread(Thread):
                         self._go_to_helper.reset()
                         self._go_to_helper.target_position = self._current_command
                         self._go_to_helper.detour_path = []
+                        LOGGER.debug(f'Start Path: {self._path}')
+                        LOGGER.debug(f'Start Position: {self._current_command}')
 
                 elif isinstance(command, Motion):
                     motion = command
@@ -2001,8 +2003,9 @@ class FlyControlThread(Thread):
                 self._extra_log[DroneExtraLog.OBSTACLE_DIRECTION] = self._go_to_helper.obstacle_direction.name
 
                 if self._go_to_helper.avoiding_obstacle_special_position is not None:
-                    if not is_behind_me(self._drone_state.position, self._go_to_helper.avoiding_obstacle_special_position,
-                                    self._go_to_helper.moving_direction):
+                    if not is_behind_me(self._drone_state.position,
+                                        self._go_to_helper.avoiding_obstacle_special_position,
+                                        self._go_to_helper.moving_direction):
                         return Motion.forward(self.setting.velocity.auto_velocity.get().vx)
 
                     else:
@@ -2232,6 +2235,36 @@ class FlyControlThread(Thread):
         # TODO maintain at any yaw
         pass
 
+    def _create_path(self, target: Position) -> Path:
+        relevant_direction = point_relevant_location(self._drone_state.position, target)
+        relevant_direction = (
+        AxisDirection.from_gdirection(relevant_direction[0]), AxisDirection.from_gdirection(relevant_direction[1]))
+
+        distance = (
+            round_up(self._drone_distance_by_direction(relevant_direction[0].rotate(self.round_yaw)), 0.05),
+            round_up(self._drone_distance_by_direction(relevant_direction[1].rotate(self.round_yaw)), 0.05),
+        )
+
+        if distance[0] > distance[1]:
+            start_direction = relevant_direction[0]
+        elif distance[0] < distance[1]:
+            start_direction = relevant_direction[1]
+        else:
+            if relevant_direction[0].to_yaw() == self.round_yaw:
+                start_direction = relevant_direction[0]
+            elif relevant_direction[1].to_yaw() == self.round_yaw:
+                start_direction = relevant_direction[1]
+            else:
+                start_direction = relevant_direction[0] if relevant_direction[0].axis == Axis.Y else relevant_direction[
+                    1]
+
+        cur_pos = self._drone_state.position
+        midpoint = Position(cur_pos.x, target.y, target.z) if start_direction.axis == Axis.Y else Position(target.x,
+                                                                                                           cur_pos.y,
+                                                                                                           target.z)
+
+        return Path(name='Generated', positions=[cur_pos, midpoint, target])
+
     def _safe_check(self, motion: Motion):
         """ This function ensure that the maximum velocity and acceleration is not exceeded.
         """
@@ -2283,6 +2316,18 @@ class FlyControlThread(Thread):
         self._set_maintain_direction(False)
         self._go_to_helper.hold_position = self._drone_state.position
 
+    def _drone_distance_by_direction(self, direction: AxisDirection):
+        if direction == AxisDirection.x_positive():
+            return self._drone_state.front_distance
+        elif direction == AxisDirection.x_negative():
+            return self._drone_state.rear_distance
+        elif direction == AxisDirection.y_positive():
+            return self._drone_state.left_distance
+        elif direction == AxisDirection.y_negative():
+            return self._drone_state.right_distance
+        else:
+            raise ValueError(f'Invalid direction: {direction}')
+
     @property
     def setting(self) -> FlyControlSetting:
         return self._fly_control.setting
@@ -2310,6 +2355,18 @@ class FlyControlThread(Thread):
     @property
     def hover_set(self) -> bool:
         return self.hover_position.x is not None and self.hover_position.y is not None and self.hover_position.z is not None
+
+    @property
+    def round_yaw(self) -> float:
+        yaw = self._drone_state.yaw
+        if -45 < yaw <= 45:
+            return 0
+        elif 45 < yaw <= 135:
+            return 90
+        elif -135 < yaw <= -45:
+            return -90
+        else:
+            return 180
 
     def __repr__(self) -> str:
         created_time = self._created_time.strftime("%Y-%m-%d %H:%M:%S")
