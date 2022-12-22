@@ -111,6 +111,8 @@ class ControlQueueCommandPriority(Enum):
         return self.value > other.value
 
     def __eq__(self, other):
+        if not isinstance(other, ControlQueueCommandPriority):
+            return False
         return self.value == other.value
 
     def __le__(self, other):
@@ -120,6 +122,8 @@ class ControlQueueCommandPriority(Enum):
         return self.value >= other.value
 
     def __ne__(self, other):
+        if not isinstance(other, ControlQueueCommandPriority):
+            return False
         return self.value != other.value
 
     def __str__(self):
@@ -142,9 +146,13 @@ class ControlQueueCommand:
         return self.priority > other.priority
 
     def __eq__(self, other):
+        if not isinstance(other, ControlQueueCommand):
+            return False
         return self.priority == other.priority and self.data == other.data
 
     def __ne__(self, other):
+        if not isinstance(other, ControlQueueCommand):
+            return True
         return self.priority != other.priority or self.data != other.data
 
     def __le__(self, other):
@@ -920,7 +928,7 @@ class FlyControl:
             height (float, optional): take off height. Defaults to 0.4.
         """
         self._drone = drone
-        self._control_thread = None
+        self._control_thread: FlyControlThread | None = None
         self.setting = FlyControlSetting()
         self.setting.fly_mode.callbacks.add_callback(self._set_fly_mode_cb)
         self._control_mode = FlyControlMode.MANUALLY
@@ -1004,6 +1012,7 @@ class FlyControl:
         self._control_thread.add_command(action)
 
     def go_to(self, command: Position | Path):
+        # self._control_thread = FlyControlThread(self._drone)
         if not self.is_flying:
             LOGGER.debug(f'[Fly Control] {self._drone.name} is not flying')
             return
@@ -1012,7 +1021,18 @@ class FlyControl:
                 f'[Fly Control] {self._drone.name} invalid position')
             return
         LOGGER.drone(f'Going to {command}')
-        self._control_thread.add_command(command)
+
+        if isinstance(command, Position):
+            # path = self._control_thread.create_path(command)
+            self._control_thread.add_command(self._control_thread.create_path(command))
+            # pass
+        else:
+            first_point_path = command.set_first_position(self._drone.state.position)
+            LOGGER.debug(f'First point path: {first_point_path}')
+            generated_path = self._control_thread.create_path(first_point_path)
+            self._control_thread.add_command(generated_path)
+            LOGGER.debug(f'Generated path: {generated_path}')
+            self._control_thread.add_command(command)
 
     def move_distance(self, distance_x: float, distance_y: float, distance_z: float, velocity: float = None):
         """Move the drone in x, y, z direction for the given distance. (From `motion_commander`). This will block 
@@ -1284,56 +1304,59 @@ class FlyControlThread(Thread):
                             self._current_command = command
                             self._get_command()
 
-                if command == ControlQueueCommand.TERMINATE:
-                    break
+                # process new command
 
-                # Manually Command
-                if isinstance(command.data, FlyCommandManually):
+                    if command == ControlQueueCommand.TERMINATE():
+                        break
 
-                    if self.setting.control_mode.get() != FlyControlMode.MANUALLY:
-                        LOGGER.debug(
-                            f'[Fly Control] {self._drone.name} received manual command but not in manually mode')
-                        continue
-                    else:
-                        self._current_command = command
-                        self._fly_control.fly_mode = FlyMode.NORMAL
-                # Go to position command
-                elif isinstance(command.data, Position):  # Go to this position
-                    self._current_command = command
-                    self.setting.fly_mode.set(FlyMode.TARGET)
-                    self._go_to_helper.reset()
-                    self._go_to_helper.target_position = command
-                    self._path = self._create_path(command.data)
-                    LOGGER.debug(f'Generated path: {self._path}')
+                    # Manually Command
+                    if isinstance(command.data, FlyCommandManually):
 
-                # Path command
-                elif isinstance(command.data, Path):
-                    if not command.data.is_empty():
-                        self._path = command.data
-                        self._path.set_first_position(self._drone_state.position)
-                        # self._current_command = self._path.get_next_position()
-                        self.setting.fly_mode.set(FlyMode.TARGET)
-                        self._go_to_helper.reset()
-                        self._go_to_helper.target_position = self._path.get_next_position()
-                        self._go_to_helper.detour_path = []
-                        LOGGER.debug(f'Start Path: {self._path}')
-                        LOGGER.debug(f'Start Position: {self._current_command}')
+                        if self.setting.control_mode.get() != FlyControlMode.MANUALLY:
+                            LOGGER.debug(
+                                f'[Fly Control] {self._drone.name} received manual command but not in manually mode')
+                            continue
+                        else:
+                            # self._current_command = command
+                            self._fly_control.fly_mode = FlyMode.NORMAL
+                    # # Go to position command
+                    # elif isinstance(command.data, Position):  # Go to this position
+                    #     self._current_command = command
+                    #     self.setting.fly_mode.set(FlyMode.TARGET)
+                    #     self._go_to_helper.reset()
+                    #     self._go_to_helper.target_position = command
+                    #     self._path = self.create_path(command.data)
+                    #     LOGGER.debug(f'Generated path: {self._path}')
 
-                elif isinstance(command.data, Motion):
-                    motion = command.data
+                    # Path command
+                    elif isinstance(command.data, Path):
+                        if not command.data.is_empty():
+                            self._path = command.data
+                            # self._path.set_first_position(self._drone_state.position)
+                            # self._current_command = self._path.get_next_position()
+                            self.setting.fly_mode.set(FlyMode.TARGET)
+                            self._go_to_helper.reset()
+                            self._go_to_helper.target_position = self._path.get_next_position()
+                            self._go_to_helper.detour_path = []
+                            LOGGER.debug(f'Start Path: {self._path}')
+                            LOGGER.debug(f'Start Position: {self._path.get_current_position()}')
 
-                # Debug option:
-                elif isinstance(command.data, AxisDirection):
-                    if not self._drone._debug:
-                        LOGGER.warn(
-                            f'[Fly Control] {self._drone.name} is not in debug mode')
-                    else:
-                        # self._current_command = command
-                        self.setting.fly_mode.set(FlyMode.HOVER)
+                    elif isinstance(command.data, Motion):
+                        motion = command.data
+
+                    # Debug option:
+                    elif isinstance(command.data, AxisDirection):
+                        if not self._drone._debug:
+                            LOGGER.warn(
+                                f'[Fly Control] {self._drone.name} is not in debug mode')
+                        else:
+                            # self._current_command = command
+                            self.setting.fly_mode.set(FlyMode.HOVER)
 
                 if self.fly_status == FlyStatus.TAKING_OFF:
                     self._extra_log[DroneExtraLog.STATUS] = 'Taking Off'
                     current_position = self._drone_state.position
+                    print(f'Current Position: {current_position.z}, Target: {self.setting.distance.take_off_height.get()}')
                     if current_position.z < self.setting.distance.take_off_height.get():
                         motion = self.get_hover_velocity(self.hover_position,
                                                          override_z=self.setting.velocity.take_off_velocity.get())
@@ -1366,61 +1389,61 @@ class FlyControlThread(Thread):
                     # if int(self._drone_state.thrust) == 0:
                     #     LOGGER.debug("Fly control stopped due to 0 thrust")
                     #     break
+                    if self._current_command is not None:
+                        # Check manually fly time. Only process if the velocity is not 0
+                        if self.setting.control_mode.get() == FlyControlMode.MANUALLY and \
+                                not self.setting.manually_control_hold.get() and \
+                                (isinstance(self._current_command.data,
+                                            FlyCommandManually) or self.manually_fly_time != 0):  # Ensure that there is actually some motion need to hold
 
-                    # Check manually fly time. Only process if the velocity is not 0
-                    if self.setting.control_mode.get() == FlyControlMode.MANUALLY and \
-                            not self.setting.manually_control_hold.get() and \
-                            (isinstance(command.data,
-                                        FlyCommandManually) or self.manually_fly_time != 0):  # Ensure that there is actually some motion need to hold
+                            motion = self._process_manually_fly_command(
+                                self._current_command.data)
 
-                        motion = self._process_manually_fly_command(
-                            self._current_command.data)
+                            if self.manually_fly_time == 0:
+                                # Start flying. Remove all setting for hover
+                                self._fly_control.fly_mode = FlyMode.NORMAL
+                                self.manually_fly_time = time.perf_counter()
 
-                        if self.manually_fly_time == 0:
-                            # Start flying. Remove all setting for hover
-                            self._fly_control.fly_mode = FlyMode.NORMAL
-                            self.manually_fly_time = time.perf_counter()
+                            else:
+                                now = time.perf_counter()
 
-                        else:
-                            now = time.perf_counter()
+                                if now - self.manually_fly_time > self.MANUALLY_HOLD_TIME:
+                                    # Manually Finish
+                                    self.manually_fly_time = 0
+                                    motion = Motion.zero()
+                                    # finish flying. Set the mode back to hover
+                                    self._fly_control.fly_mode = FlyMode.HOVER
+                                    self._current_command = None
+                                    self._set_maintain_direction(False)
 
-                            if now - self.manually_fly_time > self.MANUALLY_HOLD_TIME:
-                                # Manually Finish
-                                self.manually_fly_time = 0
-                                motion = Motion.zero()
-                                # finish flying. Set the mode back to hover
-                                self._fly_control.fly_mode = FlyMode.HOVER
+                        # Debug Purpose Session
+                        # All the code below is for debug purpose. It is for testing individual motion to
+                        # ensure they all work perfectly
+
+                        # Debug AxisDirection
+                        if isinstance(self._current_command.data, AxisDirection):
+                            axis: AxisDirection = self._current_command.data
+                            if axis.axis == Axis.X and axis.direction == Direction.POSITIVE:
+                                dist = Position(-5, 0, 0)
+                            elif axis.axis == Axis.X and axis.direction == Direction.NEGATIVE:
+                                dist = Position(5, 0, 0)
+                            elif axis.axis == Axis.Y and axis.direction == Direction.NEGATIVE:
+                                dist = Position(0, 5, 0)
+                            else:
+                                dist = Position(0, -5, 0)
+
+                            yaw = self._get_yaw(axis.axis,
+                                                dist,
+                                                self._drone_state.yaw,
+                                                self.setting.distance.yaw_trigger_degree.get(),
+                                                self.setting.velocity.auto_velocity.get().yaw)
+
+                            self.yaw_control_history.append(yaw)
+
+                            if self.yaw_control_history.avg() == 0:
                                 self._current_command = None
-                                self._set_maintain_direction(False)
 
-                    # Debug Purpose Session
-                    # All the code below is for debug purpose. It is for testing individual motion to
-                    # ensure they all work perfectly
-
-                    # Debug AxisDirection
-                    if isinstance(self._current_command.data, AxisDirection):
-                        axis: AxisDirection = self._current_command.data
-                        if axis.axis == Axis.X and axis.direction == Direction.POSITIVE:
-                            dist = Position(-5, 0, 0)
-                        elif axis.axis == Axis.X and axis.direction == Direction.NEGATIVE:
-                            dist = Position(5, 0, 0)
-                        elif axis.axis == Axis.Y and axis.direction == Direction.NEGATIVE:
-                            dist = Position(0, 5, 0)
-                        else:
-                            dist = Position(0, -5, 0)
-
-                        yaw = self._get_yaw(axis.axis,
-                                            dist,
-                                            self._drone_state.yaw,
-                                            self.setting.distance.yaw_trigger_degree.get(),
-                                            self.setting.velocity.auto_velocity.get().yaw)
-
-                        self.yaw_control_history.append(yaw)
-
-                        if self.yaw_control_history.avg() == 0:
-                            self._current_command = None
-
-                        motion = motion + Motion(0, 0, 0, yaw)
+                            motion = motion + Motion(0, 0, 0, yaw)
 
                     # Debug End
 
@@ -1507,7 +1530,7 @@ class FlyControlThread(Thread):
         This will block for `UPDATE_PERIOD` seconds.
         """
         try:
-            return self._control_queue.dequeue(time_out=self.UPDATE_PERIOD)
+            return self._control_queue.dequeue()
         except Empty:
             return None
 
@@ -1516,14 +1539,16 @@ class FlyControlThread(Thread):
         This will not block.
         """
         try:
+            time.sleep(self.UPDATE_PERIOD)
             return self._control_queue.peek(time_out=self.UPDATE_PERIOD)
         except Empty:
             return None
 
-    def add_command(self, command: Motion | FlyCommandManually | AxisDirection, debug: bool = False):
+    def add_command(self, command: Motion | FlyCommandManually | AxisDirection| Path, debug: bool = False):
         """Add a new Motion to the queue.
 
         Args:
+            debug (): Is it debug command, debug command have higher priority than normal command
             command (FlyCommandFlag): command to be performed
         """
         self._control_queue.enqueue(
@@ -1697,6 +1722,8 @@ class FlyControlThread(Thread):
         else:
             velocity = distance
 
+        velocity = 0 if velocity < 0.03 else velocity
+
         # point on direction
         d_point = Position.from_point2d(direction.points[0])
         l = point_relevant_location_yaw(d_point, position, yaw)
@@ -1708,6 +1735,7 @@ class FlyControlThread(Thread):
 
         distance = distance if l == GDirection.WEST else -distance
         self._extra_log[DroneExtraLog.MAINTAIN_DIRECTION_OFFSET] = distance
+
 
         correction = Motion(0, round(velocity, 2), 0, 0) + motion
         return correction
@@ -2069,7 +2097,7 @@ class FlyControlThread(Thread):
                 else:
                     thrust_percent = max(thrust_percent, 0.3)
                     vx = velocity.vy * thrust_percent
-                    motion.vx = vx
+                    motion.vx = vx if vx > 0.07 else 0.07
                     self._extra_log[DroneExtraLog.THRUST_PERCENT] = thrust_percent
             else:  # avoiding the obstacle
                 self._extra_log[DroneExtraLog.AVOIDING_OBSTACLE] = True
@@ -2188,19 +2216,19 @@ class FlyControlThread(Thread):
         gdirection = point_relevant_location(target, pos)
 
         if direction == AxisDirection.x_positive():
-            if gdirection[0] == GDirection.NORTH:
+            if gdirection[0] == GDirection.EAST:
                 return True
             return False
         elif direction == AxisDirection.x_negative():
-            if gdirection[0] == GDirection.SOUTH:
+            if gdirection[0] == GDirection.WEST:
                 return True
             return False
         elif direction == AxisDirection.y_positive():
-            if gdirection[1] == GDirection.WEST:
+            if gdirection[1] == GDirection.NORTH:
                 return True
             return False
         elif direction == AxisDirection.y_negative():
-            if gdirection[1] == GDirection.EAST:
+            if gdirection[1] == GDirection.SOUTH:
                 return True
             return False
         # Unknown direction Always assume it is pass the target
@@ -2308,7 +2336,7 @@ class FlyControlThread(Thread):
         # TODO maintain at any yaw
         pass
 
-    def _create_path(self, target: Position) -> Path:
+    def create_path(self, target: Position) -> Path:
         relevant_direction = point_relevant_location(self._drone_state.position, target)
         relevant_direction = (
             AxisDirection.from_gdirection(relevant_direction[0]), AxisDirection.from_gdirection(relevant_direction[1]))

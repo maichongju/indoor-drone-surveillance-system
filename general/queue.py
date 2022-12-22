@@ -1,4 +1,4 @@
-import time
+from time import monotonic as time
 
 
 class Empty(Exception):
@@ -26,9 +26,9 @@ class Queue:
 
     def peek(self, time_out=None):
         if time_out is not None:
-            start_time = time.time()
+            start_time = time()
             while self.is_empty():
-                if time.time() - start_time > time_out:
+                if time() - start_time > time_out:
                     raise Empty('Queue is empty')
         if self.is_empty():
             raise Empty('Queue is empty')
@@ -56,16 +56,15 @@ class PriorityQueue(Queue):
             self._queue.append(item)
         else:
             if item < self._queue[self._priority_index]:
-                self._priority_index = 0
-
-            self._queue.insert(0, item)
+                self._priority_index = len(self._queue)
+            self._queue.append(item)
 
     def dequeue(self, time_out=None):
-        if time_out is not None:
-            start_time = time.time()
-            while self.is_empty():
-                if time.time() - start_time > time_out:
-                    raise Empty('Queue is empty')
+        # if time_out is not None:
+        #     start_time = time.time()
+        #     while self.is_empty():
+        #         if time.time() - start_time > time_out:
+        #             raise Empty('Queue is empty')
 
         if self.is_empty():
             raise Empty('Queue is empty')
@@ -75,11 +74,13 @@ class PriorityQueue(Queue):
         return item
 
     def peek(self, time_out=None):
-        if time_out is not None:
-            start_time = time.time()
-            while self.is_empty():
-                if time.time() - start_time > time_out:
-                    raise Empty('Queue is empty')
+        # if time_out is not None:
+        #     end_time = time() + time_out
+        #     while self.is_empty():
+        #         remaining = end_time - time()
+        #         if remaining <= 0.0:
+        #             raise Empty('Queue is empty')
+        # else:
         if self.is_empty():
             raise Empty('Queue is empty')
         return self._queue[self._priority_index]

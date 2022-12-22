@@ -217,6 +217,7 @@ class AxisDirection:
         direction = self
         for _ in range(abs(shift)):
             direction = direction.rotate_left() if ccw else direction.rotate_right()
+        return direction
 
     def rotate_right(self) -> AxisDirection:
         if not self.is_complete():
@@ -474,15 +475,15 @@ def point_relevant_location(p1: Position, p2: Position, yaw: float = 0) -> Tuple
 
     x_axis = GDirection.SAME
     if p2.x > p1.x:
-        x_axis = GDirection.NORTH
+        x_axis = GDirection.EAST
     elif p2.x < p1.x:
-        x_axis = GDirection.SOUTH
+        x_axis = GDirection.WEST
 
     y_axis = GDirection.SAME
     if p2.y > p1.y:
-        y_axis = GDirection.WEST
+        y_axis = GDirection.NORTH
     elif p2.y < p1.y:
-        y_axis = GDirection.EAST
+        y_axis = GDirection.SOUTH
 
     return (x_axis, y_axis)
 

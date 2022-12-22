@@ -80,12 +80,14 @@ class Path:
 
         return self._positions[self._current]
 
-    def set_first_position(self, cur_pos: Position):
+    def set_first_position(self, cur_pos: Position) -> Position:
         """
         Compare all the set points in the path with the current position and set the first point as the closest point
         to the current position
         Args:
             cur_pos: current position of the drone
+        Returns:
+            This will return the first point in the path
         """
         assert len(self._positions) > 0, 'Path is empty'
         self._current = 0
@@ -95,6 +97,10 @@ class Path:
             if dist < min_dist:
                 min_dist = dist
                 self._current = i
+        return self._positions[self._current]
+
+    def get_current_position(self) -> Position:
+        return self._positions[self._current]
 
     def replace_pos_all(self, pos: list[Position]):
         """
