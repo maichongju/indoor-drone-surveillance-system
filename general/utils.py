@@ -4,6 +4,7 @@ import ipaddress
 import json
 import math
 import re
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
@@ -647,3 +648,7 @@ def insert_list_to_list(origin_list: list, insert_list: list, index: int):
     [1,2,5,6,3,4]
     """
     origin_list[index:index] = insert_list
+
+
+def get_sorted_file_list(path: str) -> List[Path]:
+    return sorted(Path(path).iterdir(), key=os.path.getmtime)
