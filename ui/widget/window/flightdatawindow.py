@@ -13,7 +13,7 @@ from ui.widget.tab.threedplottab import ThreeDPlotVispyTab
 from ui.widget.tab.twodplottab import TwoDPlotTab
 
 # Must import this before importing matplotlib
-from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QFileDialog, QTabWidget, QMessageBox
+from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QFileDialog, QTabWidget, QMessageBox, QLabel
 
 import traceback
 import pandas as pd
@@ -50,6 +50,9 @@ class FlightDataWindow(QWidget):
         tool_layout.addWidget(btn_clear)
 
         tool_layout.addStretch()
+
+        self.lbl_file_name = QLabel()
+        tool_layout.addWidget(self.lbl_file_name)
 
         tab = QTabWidget(self)
         main_layout.addWidget(tab)
