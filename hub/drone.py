@@ -781,6 +781,9 @@ class FlyControlVelocity:
     land_velocity: VariableCallback = field(
         default_factory=lambda: VariableCallback(0.1))
 
+    def __getstate__(self):
+        return self.__dict__
+
 
 @dataclass(frozen=True)
 class FlyControlDistance:
@@ -848,6 +851,9 @@ class FlyControlDistance:
     landing_cutoff_height: VariableCallback = field(
         default_factory=lambda: VariableCallback(0.1))
 
+    def __getstate__(self):
+        return self.__dict__
+
 
 @dataclass(frozen=True)
 class FlyControlSetting:
@@ -912,6 +918,14 @@ class FlyControlSetting:
         self.manually_control_hold.set(False)
         self.auto_avoid_obstacle.set(True)
         self.fly_motion.set(Motion.zero())
+
+    def to_json(self) -> str:
+        return jsonpickle.encode({
+            'distance': self.distance,
+            'velocity': self.velocity,
+        },
+            indent=4,
+            unpicklable=False)
 
     def __getstate__(self):
         return self.__dict__
@@ -1284,6 +1298,11 @@ class FlyControlThread(Thread):
 
             LOGGER.debug('Dump flight data to ' +
                          self._dump_flight_data_file.name)
+
+            file_name = self._dump_flight_data_file.name
+            with open(f'{file_name}_setting.json', 'w') as setting_file:
+                setting_file.write(self._drone.fly_control.setting.to_json())
+
 
     def run(self):
         motion = Motion()
