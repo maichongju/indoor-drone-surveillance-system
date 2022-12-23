@@ -651,5 +651,8 @@ def insert_list_to_list(origin_list: list, insert_list: list, index: int):
     origin_list[index:index] = insert_list
 
 
-def get_sorted_file_list(path: str) -> List[Path]:
-    return sorted(Path(path).iterdir(), key=os.path.getmtime)
+def get_sorted_file_list(path: str, extension: str = None) -> List[Path]:
+    if extension is None:
+        return sorted(Path(path).iterdir(), key=os.path.getmtime)
+    else:
+        return sorted(Path(path).glob(f'*.{extension}'), key=os.path.getmtime)

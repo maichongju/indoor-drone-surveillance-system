@@ -66,7 +66,7 @@ class FlightDataWindow(QWidget):
     def _load_last_flight_data_on_click(self):
         try:
             self.clear()
-            file = utils.get_sorted_file_list('logs/flight_data')[-1]
+            file = utils.get_sorted_file_list('logs/flight_data',extension='csv')[-1]
             df = self._prepare_log_files('\\'.join(file.parts))
             self._plot(df, file.name)
 
