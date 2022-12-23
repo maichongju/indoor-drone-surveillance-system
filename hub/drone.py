@@ -754,7 +754,7 @@ class FlyControlVelocity:
     # type Motion
     # max speed for each direction when in auto mode
     auto_velocity: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Motion(0.10, 0.10, 0.1, 360 / 20)))
+        default_factory=lambda: VariableCallback(Motion(0.15, 0.15, 0.1, 360 / 20)))
 
     # type Motion
     # auto avoidance speed
@@ -801,7 +801,7 @@ class FlyControlDistance:
     # Distance for go to hold. More distance
     # type Position
     hold_correction_min_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Position(0.15, 0.15, 0.1)))
+        default_factory=lambda: VariableCallback(Position(0.10, 0.10, 0.1)))
 
     # type Position
     hold_correction_max_distance: VariableCallback = field(
@@ -1313,7 +1313,7 @@ class FlyControlThread(Thread):
                 motion = Motion()
                 # Update every 0.05 seconds
 
-                command: ControlQueueCommand = self._peek_command()
+                command: ControlQueueCommand | None = self._peek_command()
                 if command is not None:
                     if self._current_command is None:
                         self._current_command = command
@@ -1322,9 +1322,11 @@ class FlyControlThread(Thread):
                         if command.priority > self._current_command.priority:
                             self._current_command = command
                             self._get_command()
+                        else:
+                            command = None
 
                 # process new command
-
+                if command is not None:
                     if command == ControlQueueCommand.TERMINATE():
                         break
 
@@ -1364,7 +1366,7 @@ class FlyControlThread(Thread):
                         motion = command.data
 
                     # Debug option:
-                    elif isinstance(command.data, AxisDirection):
+                    elif isinstance(self._current_command.data, AxisDirection):
                         if not self._drone._debug:
                             LOGGER.warn(
                                 f'[Fly Control] {self._drone.name} is not in debug mode')
@@ -1375,7 +1377,6 @@ class FlyControlThread(Thread):
                 if self.fly_status == FlyStatus.TAKING_OFF:
                     self._extra_log[DroneExtraLog.STATUS] = 'Taking Off'
                     current_position = self._drone_state.position
-                    print(f'Current Position: {current_position.z}, Target: {self.setting.distance.take_off_height.get()}')
                     if current_position.z < self.setting.distance.take_off_height.get():
                         motion = self.get_hover_velocity(self.hover_position,
                                                          override_z=self.setting.velocity.take_off_velocity.get())
@@ -1563,7 +1564,7 @@ class FlyControlThread(Thread):
         except Empty:
             return None
 
-    def add_command(self, command: Motion | FlyCommandManually | AxisDirection| Path, debug: bool = False):
+    def add_command(self, command: Motion | FlyCommandManually | AxisDirection | Path, debug: bool = False):
         """Add a new Motion to the queue.
 
         Args:
@@ -1571,7 +1572,8 @@ class FlyControlThread(Thread):
             command (FlyCommandFlag): command to be performed
         """
         self._control_queue.enqueue(
-            ControlQueueCommand(command, ControlQueueCommandPriority.MEDIUM if debug else ControlQueueCommandPriority.LOW))
+            ControlQueueCommand(command,
+                                ControlQueueCommandPriority.MEDIUM if debug else ControlQueueCommandPriority.LOW))
 
     def clear_fly_command(self):
         """
@@ -1754,7 +1756,6 @@ class FlyControlThread(Thread):
 
         distance = distance if l == GDirection.WEST else -distance
         self._extra_log[DroneExtraLog.MAINTAIN_DIRECTION_OFFSET] = distance
-
 
         correction = Motion(0, round(velocity, 2), 0, 0) + motion
         return correction
@@ -2009,7 +2010,7 @@ class FlyControlThread(Thread):
                 self._go_to_helper.moving_direction.axis = Axis.Y if self._go_to_helper.moving_direction.axis == Axis.X else Axis.X
 
             # self.go_to_set_axis_changing()
-            LOGGER.debug(f"Require axis change to {self._go_to_helper.moving_direction.axis}")
+            LOGGER.debug(f"Require axis change to {self._go_to_helper.moving_direction.axis}. hold position: {current_pos}")
             self._change_to_hold(next_action=GoToAction.AXIS_CHANGING, hold_position=current_pos)
         self._extra_log[DroneExtraLog.GO_TO_MODE] = self._go_to_helper.action.name
 
@@ -2103,7 +2104,7 @@ class FlyControlThread(Thread):
 
                 self._extra_log[DroneExtraLog.THRUST_PERCENT] = thrust_percent
 
-                if thrust_percent < 0.01 or self._is_pass_target(
+                if thrust_percent < 0.1 or self._is_pass_target(
                         self._go_to_helper.moving_direction, self._drone_state.position,
                         self._go_to_helper.target_position):
                     # starting approaching the target. Use the hold mode
@@ -2114,9 +2115,8 @@ class FlyControlThread(Thread):
                     self._go_to_helper.detour_path.append(hover_pos)
 
                 else:
-                    thrust_percent = max(thrust_percent, 0.3)
                     vx = velocity.vy * thrust_percent
-                    motion.vx = vx if vx > 0.07 else 0.07
+                    motion.vx = vx if vx > 0.05 else 0.05
                     self._extra_log[DroneExtraLog.THRUST_PERCENT] = thrust_percent
             else:  # avoiding the obstacle
                 self._extra_log[DroneExtraLog.AVOIDING_OBSTACLE] = True
@@ -2382,8 +2382,16 @@ class FlyControlThread(Thread):
         midpoint = Position(cur_pos.x, target.y, target.z) if start_direction.axis == Axis.Y else Position(target.x,
                                                                                                            cur_pos.y,
                                                                                                            target.z)
+        distance_to_mid = Position.abs(cur_pos - midpoint)
+        hold_margin = self.setting.distance.hold_correction_max_distance.get()
+        if start_direction.axis == Axis.Y and distance_to_mid.y < hold_margin.y:
+            midpoint = None
+        elif start_direction.axis == Axis.X and distance_to_mid.x < hold_margin.x:
+            midpoint = None
 
-        return Path(name='Generated', positions=[cur_pos, midpoint, target])
+        positions = [cur_pos, midpoint, target] if midpoint is not None else [cur_pos, target]
+
+        return Path(name='Generated', positions=positions)
 
     def _safe_check(self, motion: Motion):
         """ This function ensure that the maximum velocity and acceleration is not exceeded.

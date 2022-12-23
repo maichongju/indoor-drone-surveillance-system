@@ -279,7 +279,14 @@ class DebugTab(Tab):
         path.add_position(Position(0, -1, 0.4))
         path.add_position(Position(0, 0, 0.4))
         print("pressed")
+
+        first_point_path = path.set_first_position(self._drone.state.position)
+        LOGGER.debug(f'First point path: {first_point_path}')
+        generated_path = self._drone.fly_control._control_thread.create_path(first_point_path)
+        self._drone.fly_control.debug_add_command(generated_path)
+        LOGGER.debug(f'Generated path: {generated_path}')
         self._drone.fly_control.debug_add_command(path)
+
 
     def _power_action_on_click(self, state: DronePowerAction):
         self._drone.perform_power_action(state)
