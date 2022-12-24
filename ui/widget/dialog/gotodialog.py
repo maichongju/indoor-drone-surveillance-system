@@ -198,7 +198,7 @@ class GoToDialog(QDialog):
                 QMessageBox.warning(self, "Invalid input", "Invalid x, y, z position")
                 return
         elif self.mode == self.Mode.PATH:
-            cur_path = self._path_widget.get_current_path()
+            cur_path = self._path_widget.get_selected_path()
             if cur_path is None:
                 QMessageBox.warning(self, "Invalid input", "No path selected")
                 return
@@ -237,7 +237,7 @@ class GoToDialog(QDialog):
         return size
 
     def tab_change_cb(self, index):
-        self.resize(self._get_tab_size(add_height=50))
+        self.resize(self._get_tab_size())
         self.mode = self.Mode.POSITION if index == 0 else self.Mode.PATH
 
 
