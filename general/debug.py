@@ -57,6 +57,7 @@ class DroneExtraLog(str, Enum):
     AVOIDING_OBSTACLE = 'avoiding_obstacle'
     OBSTACLE_DIRECTION = 'obstacle_direction'
     OBSTACLE_DISTANCE_AVG = 'obstacle_distance_avg'
+    TARGET_POS = 'target_pos'
 
     @staticmethod
     def to_csv_header():

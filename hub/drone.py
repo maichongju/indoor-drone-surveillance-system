@@ -2074,6 +2074,7 @@ class FlyControlThread(Thread):
                 # self._go_to_helper.hold_position = self._drone_state.position
 
         elif self._go_to_helper.action == GoToAction.MOVING:
+            self._extra_log[DroneExtraLog.TARGET_POS] = self._go_to_helper.target_position.to_csv(escape=True)
             # Obstacle detected need to change direction
             if self._drone_state.front_distance < turn_trigger_distance.x:
                 self._go_to_helper.action = GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE
