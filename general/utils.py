@@ -447,7 +447,7 @@ def rotate_point(point: tuple[float, float], degree: float, rotate_origin: tuple
 
 def point_relevant_location_yaw(p1: Position, p2: Position, yaw: float) -> GDirection:
     """This function only consider 2d plane. It will return the relevant direction 
-    of the point. this consider the yaw of the drone. WEST means left, EAST means right,
+    of p1. this consider the yaw of the drone. WEST means left, EAST means right,
     Example:
         >>> point_location(Position(1,1), Position(2,1))
         POSITIVE

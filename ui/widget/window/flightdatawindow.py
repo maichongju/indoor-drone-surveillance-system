@@ -83,9 +83,8 @@ class FlightDataWindow(QWidget):
             file_name = file_path.split('/')[-1]
             if file_path == '':
                 return
-                # file_path = 'logs/flightdataexample.csv'
-            df = self._prepare_log_files(file_name)
-            self._plot(df)
+            df = self._prepare_log_files(file_path)
+            self._plot(df, file_name)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error when loading file ({e})")
             LOGGER.debug(traceback.format_exc())
