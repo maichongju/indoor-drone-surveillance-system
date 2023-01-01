@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
-from typing import TextIO, Tuple
+from typing import TextIO, Tuple, List
 
 import jsonpickle
+from sympy import Line
 
 from general.utils import Position
 from log.logger import LOGGER
@@ -19,7 +20,7 @@ class Path:
     def __init__(self, name: str = '', positions: list[Position] = None, connected: bool = False):
         self.name = name
         self._current = 0
-        self._positions = []
+        self._positions: List[Position] = []
         self.connected = connected
 
         if positions is not None:
@@ -31,7 +32,7 @@ class Path:
             raise TypeError('point must be Position')
         self._positions.append(point.copy())
 
-    def add_positions_to_current(self, positions: list[Position]):
+    def add_positions_to_current(self, positions: list[Position], margin: float = 0.1):
         """
         Add the given positions to the curren path. The given positions will be clean up first
         """
@@ -39,20 +40,50 @@ class Path:
         end_pos = self._positions[self._current]
 
         relevant_direction = utils.point_relevant_location(start_pos, end_pos)
-        facing_direction = Axis.X if relevant_direction[0] == GDirection.SAME else Axis.Y
+        facing_direction = Axis.Y if relevant_direction[0] == GDirection.SAME else Axis.X
+
+        if facing_direction == Axis.Y:
+            if relevant_direction[1] == GDirection.NORTH:
+                margin = -margin
+            else:
+                margin = abs(margin)
+        else:
+            if relevant_direction[0] == GDirection.EAST:
+                margin = -margin
+            else:
+                margin = abs(margin)
+
 
         setpoints = []
         cur = start_pos
 
+        first_point = True
+
         # Clean up the positions
-        for pos in positions:
-            if facing_direction == Axis.X:
-                new_pos = Position(pos.x, cur.y, cur.z)
+        for pos in positions[:-1]:
+            if facing_direction == Axis.Y:
+                if first_point:
+                    new_pos = Position(cur.x, pos.y + margin, cur.z)
+                    first_point = False
+                else:
+                    new_pos = Position(cur.x, pos.y, cur.z)
             else:
-                new_pos = Position(cur.x, pos.y, cur.z)
+                if first_point:
+                    new_pos = Position(pos.x + margin, cur.y, cur.z)
+                    first_point = False
+                else:
+                    new_pos = Position(pos.x, cur.y, cur.z)
             setpoints.append(new_pos)
             cur = new_pos
             facing_direction = Axis.X if facing_direction == Axis.Y else Axis.Y
+
+        # last setpoint should use the combination of previous and the end setpoint
+        if facing_direction == Axis.X: # The facing direction have not been updated yet.
+            new_pos = Position(end_pos.x, cur.y, cur.z)
+        else:
+            new_pos = Position(cur.x, end_pos.y, cur.z)
+
+        setpoints.append(new_pos)
 
         utils.insert_list_to_list(self._positions, setpoints, self._current)
         self._current += len(setpoints)
@@ -101,6 +132,12 @@ class Path:
 
     def get_current_position(self) -> Position:
         return self._positions[self._current]
+
+    def get_current_direction(self) -> Line:
+        """
+        Get the current direction of the path
+        """
+        return Line(self._positions[self._current].to_point2d(), self._positions[(self._current - 1) % len(self._positions)].to_point2d())
 
     def replace_pos_all(self, pos: list[Position]):
         """
