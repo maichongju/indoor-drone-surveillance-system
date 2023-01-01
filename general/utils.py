@@ -143,6 +143,10 @@ class Position:
 
         return f"({x}, {y}, {z})"
 
+    def __eq__(self, other):
+        if not isinstance(other, Position):
+            return False
+        return self.x == other.x and self.y == other.y and self.z == other.z
 
 @dataclass
 class AxisDirection:
