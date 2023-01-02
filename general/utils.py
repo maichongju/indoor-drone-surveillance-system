@@ -24,6 +24,14 @@ class Position:
     y: float = 0.0
     z: float = 0.0
 
+    def __init__(self, x: float = 0.0, y: float = 0.0, z: float = 0.0):
+        x = 0.0 if x is None else x
+        y = 0.0 if y is None else y
+        z = 0.0 if z is None else z
+        object.__setattr__(self, 'x', round(x, 2))
+        object.__setattr__(self, 'y', round(y, 2))
+        object.__setattr__(self, 'z', round(z, 2))
+
     @staticmethod
     def from_point2d(point: Point2D) -> Position:
         return Position(point.x, point.y)
