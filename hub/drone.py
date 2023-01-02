@@ -757,7 +757,7 @@ class FlyControlVelocity:
     # type Motion
     # max speed for each direction when in auto mode
     auto_velocity: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Motion(0.15, 0.15, 0.1, 360 / 20)))
+        default_factory=lambda: VariableCallback(Motion(0.25, 0.25, 0.1, 360 / 15)))
 
     # type Motion
     # auto avoidance speed
@@ -766,10 +766,10 @@ class FlyControlVelocity:
 
     # type Motion
     hover_correction_velocity: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Motion(0.1, 0.1, 0.05, 0)))
+        default_factory=lambda: VariableCallback(Motion(0.15, 0.15, 0.05, 0)))
 
     hold_correction_velocity: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Motion(0.1, 0.1, 0.05, 0)))
+        default_factory=lambda: VariableCallback(Motion(0.25, 0.25, 0.05, 0)))
 
     # type Motion
     max_velocity: VariableCallback = field(
@@ -799,7 +799,7 @@ class FlyControlDistance:
 
     # type Position
     hover_correction_max_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Position(0.1, 0.1, 0.05)))
+        default_factory=lambda: VariableCallback(Position(0.15, 0.15, 0.05)))
 
     # Distance for go to hold. More distance
     # type Position
@@ -808,7 +808,7 @@ class FlyControlDistance:
 
     # type Position
     hold_correction_max_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Position(0.3, 0.3, 0.05)))
+        default_factory=lambda: VariableCallback(Position(0.2, 0.2, 0.05)))
 
     # type Position
     # Distance for auto avoidance to trigger
@@ -823,11 +823,11 @@ class FlyControlDistance:
     # type Position
     # Distance for auto moving to turn. (Should be grater than auto_avoidance_trigger_distance)
     auto_turn_trigger_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(Position(0.6, 0.6, 0.10)))
+        default_factory=lambda: VariableCallback(Position(0.8, 0.8, 0.10)))
 
     # type float
     auto_slow_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(0.6))
+        default_factory=lambda: VariableCallback(0.5))
 
     # type float
     # Distance for yaw correction
@@ -840,12 +840,12 @@ class FlyControlDistance:
 
     # type float
     moving_side_maintain_distance: VariableCallback = field(
-        default_factory=lambda: VariableCallback(0.5))
+        default_factory=lambda: VariableCallback(0.8))
 
     # type float
     # The margin distance that allows the drone to drift from the obstacle
     obstacle_maintain_distance_margin: VariableCallback = field(
-        default_factory=lambda: VariableCallback(0.25))
+        default_factory=lambda: VariableCallback(0.6))
 
     # type float
     take_off_height: VariableCallback = field(
@@ -1772,10 +1772,11 @@ class FlyControlThread(Thread):
         correction = Motion(0, round(velocity, 2), 0, 0) + motion
         return correction
 
-    def _get_current_direction(self) -> Line:
-        """ Get the current direction of the drone
+    def _get_direction_line(self, pos: Position= None) -> Line:
+        """ Get the direction line that for the given position that facing to. if the position is not given, then
+        it will use the current position of the drone.
         """
-        position = self._drone_state.position
+        position = self._drone_state.position if pos is None else pos
         # Use current location plus 1 on x axis as the second point. Then rotate it
         target = position + Position(1, 0, 0)
 
@@ -1968,6 +1969,7 @@ class FlyControlThread(Thread):
 
                 next_position = self._path.get_next_position()
                 if next_position is not None:
+                    self._go_to_helper.hold_position = self._go_to_helper.target_position
                     self._go_to_helper.reset()
                     self._go_to_helper.target_position = next_position
                     self._maintain_direction = None
@@ -2004,7 +2006,6 @@ class FlyControlThread(Thread):
                     self._go_to_helper.moving_direction.axis = Axis.Y
                 else:
                     self._go_to_helper.moving_direction.axis = Axis.X
-                self._go_to_helper.hold_position = current_pos
             elif self._go_to_helper.action == GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE:
 
                 # Distance to left and right (left, right)
@@ -2026,9 +2027,12 @@ class FlyControlThread(Thread):
                 self._go_to_helper.moving_direction.axis = Axis.Y if self._go_to_helper.moving_direction.axis == Axis.X else Axis.X
 
             # self.go_to_set_axis_changing()
+            if self._go_to_helper.hold_position is None:
+                self._change_to_hold(next_action=GoToAction.AXIS_CHANGING,hold_position=self._drone_state.position)
+            else:
+                self._change_to_hold(next_action=GoToAction.AXIS_CHANGING)
             LOGGER.debug(
-                f"Require axis change to {self._go_to_helper.moving_direction.axis}. hold position: {current_pos}")
-            self._change_to_hold(next_action=GoToAction.AXIS_CHANGING)
+                f"Require axis change to {self._go_to_helper.moving_direction.axis}. hold position: {self._go_to_helper.hold_position}")
         self._extra_log[DroneExtraLog.GO_TO_MODE] = self._go_to_helper.action.name
 
         if self._go_to_helper.action == GoToAction.HOLD:
@@ -2043,6 +2047,10 @@ class FlyControlThread(Thread):
 
                 # Check if next action is moving, if it is moving remove the hold position
                 if self._go_to_helper.next_action == GoToAction.MOVING:
+                    if self._go_to_helper.avoiding_obstacle:
+                        self._set_maintain_direction(True)
+                    else:
+                        self._set_maintain_direction(True, self._go_to_helper.hold_position)
                     self._go_to_helper.hold_position = None
                 self._go_to_helper.action = self._go_to_helper.next_action
                 self._go_to_helper.next_action = None
@@ -2061,6 +2069,9 @@ class FlyControlThread(Thread):
                 self._extra_log[DroneExtraLog.HOLD_CORRECTION] = correction.to_csv(escape=True)
 
         elif self._go_to_helper.action == GoToAction.AXIS_CHANGING:
+            if self._go_to_helper.hold_position is None:
+                self._go_to_helper.hold_position = self._drone_state.position
+
             self._extra_log[DroneExtraLog.AXIS_CHANGE_TO] = str(self._go_to_helper.moving_direction.axis)
             self._extra_log[DroneExtraLog.HOLD_POS] = self._go_to_helper.hold_position.to_csv(escape=True)
 
@@ -2088,7 +2099,6 @@ class FlyControlThread(Thread):
                 self._go_to_helper.moving_direction = AxisDirection.from_yaw(
                     current_yaw)
                 self._go_to_helper.target_yaw = None
-                self._set_maintain_direction(True)
                 LOGGER.debug(
                     f"Axis changed finished. change to Hold, hold position: {self._go_to_helper.hold_position}")
                 # self._go_to_helper.hold_position = self._drone_state.position
@@ -2098,6 +2108,7 @@ class FlyControlThread(Thread):
             # Obstacle detected need to change direction
             if self._drone_state.front_distance < turn_trigger_distance.x:
                 self._go_to_helper.action = GoToAction.REQUIRE_AXIS_CHANGE_OBSTACLE
+                self._go_to_helper.hold_position = current_pos
                 LOGGER.debug(f"Obstacle detected, change direction (front:{self._drone_state.front_distance})")
                 self._go_to_helper.detour_path.append(self._drone_state.position)
                 return motion
@@ -2149,15 +2160,6 @@ class FlyControlThread(Thread):
                 self._extra_log[DroneExtraLog.AVOIDING_OBSTACLE] = True
                 self._extra_log[DroneExtraLog.OBSTACLE_DIRECTION] = self._go_to_helper.obstacle_direction.name
 
-                # if self._go_to_helper.avoiding_obstacle_special_position is not None:
-                #     if not is_behind_me(self._drone_state.position,
-                #                         self._go_to_helper.avoiding_obstacle_special_position,
-                #                         self._go_to_helper.moving_direction):
-                #         return Motion.forward(self.setting.velocity.auto_velocity.get().vx)
-                #
-                #     else:
-                #         self._go_to_helper.avoiding_obstacle_special_position = None
-
                 if len(self._go_to_helper.avoiding_obstacle_special_list) != 0:
                     temp_target = self._go_to_helper.avoiding_obstacle_special_list[0]
                     if not is_behind_me(self._drone_state.position,
@@ -2194,18 +2196,6 @@ class FlyControlThread(Thread):
                         self._obstacle_avoidance_buffer.avg() > self.setting.distance.moving_side_maintain_distance.get() + \
                         self.setting.distance.obstacle_maintain_distance_margin.get():
 
-                    # if is_behind_me(self._drone_state.position, self._go_to_helper.target_position, cur_direction) or \
-                    #         self._is_target_same_side_obstacle():
-                    #     if self._go_to_helper.obstacle_direction == Direction.NEGATIVE:  # right
-                    #         self._go_to_helper.moving_direction = self._go_to_helper.moving_direction.rotate_right()
-                    #     else:  # left
-                    #         self._go_to_helper.moving_direction = self._go_to_helper.moving_direction.rotate_left()
-                    #     if not self._is_target_same_side_obstacle():
-                    #         self._go_to_helper.avoiding_obstacle = False
-                    #     hold_pos = self._add_to_current_facing(
-                    #             self.setting.distance.moving_side_maintain_distance.get() + 0.1)
-                    #     self._change_to_hold(next_action=GoToAction.AXIS_CHANGING, hold_position=hold_pos)
-
                     if self._go_to_helper.obstacle_direction == Direction.NEGATIVE:  # right
                         new_move_direction = self._go_to_helper.moving_direction.rotate_right()
                     else:  # left
@@ -2231,7 +2221,7 @@ class FlyControlThread(Thread):
                         #     self.setting.distance.moving_side_maintain_distance.get(),
                         #     self._go_to_helper.moving_direction)
                         self._go_to_helper.avoiding_obstacle_special_list.append(self._add_to_direction_facing(
-                            self.setting.distance.moving_side_maintain_distance.get() + 0.5,
+                            self.setting.distance.moving_side_maintain_distance.get(),
                             new_move_direction))
                     self._obstacle_avoidance_buffer.clear()
                     print(self._go_to_helper.avoiding_obstacle_special_list)
@@ -2283,9 +2273,9 @@ class FlyControlThread(Thread):
             self._go_to_helper.yaw_buffer.clear()
             self._set_maintain_direction(False)
 
-    def _set_maintain_direction(self, enable: bool):
+    def _set_maintain_direction(self, enable: bool, pos: Position = None):
         if enable:
-            self._maintain_direction = self._get_current_direction()
+            self._maintain_direction = self._get_direction_line(pos=pos)
             self._maintain_yaw = self._drone_state.yaw
         else:
             self._maintain_direction = None
