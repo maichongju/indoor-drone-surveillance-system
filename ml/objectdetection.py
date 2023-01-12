@@ -118,11 +118,12 @@ class _Model:
     local_dir: str
     description: str | None = None
 
-    def __init__(self, name: str, local_file: str, local_weights_dir: str, description: str = None):
+    def __init__(self, name: str, local_file: str, local_weights_dir: str, description: str = None, show_class: list = []):
         self.name = name
         self.local_file = f"{model_dir}{local_file}"
         self.local_dir = f"{model_dir}{local_weights_dir}"
         self.description = description
+        self.show_class = show_class
 
     def __getstate__(self) -> dict:
         return {
@@ -135,7 +136,8 @@ class Model(Enum):
     """ <model name>, <model file>, <model directory if any>  """
     YOLOV5 = _Model(name='yolov5s',
                     local_file='yolov5s.pt',
-                    local_weights_dir='yolov5')
+                    local_weights_dir='yolov5',
+                    show_class=[0])
 
     @staticmethod
     def getModel(model: Model) -> ObjectDetection:
@@ -277,6 +279,8 @@ class ObjectDetection:
 
         for records in results.data.values():
             for record in records:
+                if record.name.lower() != 'person':
+                    continue
                 x1, y1 = int(record.x1 * x_shape), int(record.y1 * y_shape)
                 x2, y2 = int(record.x2 * x_shape), int(record.y2 * y_shape)
                 cv2.rectangle(frame,
@@ -284,7 +288,7 @@ class ObjectDetection:
 
                 if plot_text:
                     cv2.putText(frame, record.name, (x1, y1),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, text_color, 1)
         return frame
 
     def detect(self, frame: np.ndarray,
