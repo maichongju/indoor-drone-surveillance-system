@@ -11,7 +11,7 @@ from map.path import PathList, Path
 from log.logger import LOGGER
 from ui.icon import Icon
 from ui.widget.dialog.locationeditdialog import LocationEditDialog
-from ui.widget.list import LocationListWidget, LocationItem
+from ui.widget.list import LocationListWidget, LocationItem, PathListWidget
 from ui.widget.widget import PathEditWidget
 
 
@@ -44,11 +44,11 @@ class GoToDialog(QDialog):
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
 
-        # self._path_widget = self._get_path_tab()
+        self._path_widget = self._get_path_tab()
 
         # tabs.addTab(self._get_position_tab(), "Position")
         self.tabs.addTab(self._get_position_tab(), "Position")
-        # self.tabs.addTab(self._path_widget, "Path")
+        self.tabs.addTab(self._path_widget, "Path")
 
         self.tabs.currentChanged.connect(lambda index: self.tab_change_cb(index))
 
@@ -126,7 +126,11 @@ class GoToDialog(QDialog):
         except Exception as e:
             LOGGER.warning(f"Failed to load path list: {e}")
 
-        return PathEditWidget(self.path_list)
+        widget = QWidget()
+        layout = QVBoxLayout()
+        widget.setLayout(layout)
+
+        return PathListWidget(self.path_list, self)
 
     def _list_double_click_callback(self, item: LocationItem):
         """Callback function for double click item
@@ -194,7 +198,7 @@ class GoToDialog(QDialog):
                 QMessageBox.warning(self, "Invalid input", "Invalid x, y, z position")
                 return
         elif self.mode == self.Mode.PATH:
-            cur_path = self._path_widget.get_current_path()
+            cur_path = self._path_widget.get_selected_path()
             if cur_path is None:
                 QMessageBox.warning(self, "Invalid input", "No path selected")
                 return
@@ -233,7 +237,7 @@ class GoToDialog(QDialog):
         return size
 
     def tab_change_cb(self, index):
-        self.resize(self._get_tab_size(add_height=50))
+        self.resize(self._get_tab_size())
         self.mode = self.Mode.POSITION if index == 0 else self.Mode.PATH
 
 

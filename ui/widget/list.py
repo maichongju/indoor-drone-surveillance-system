@@ -95,6 +95,15 @@ class PathListWidget(QListWidget):
         """
         return self.count() == 0
 
+    def get_selected_path(self):
+        """Get the selected path. `None` if no path is selected.
+
+        Returns:
+            Path: The selected path. `None` if no path is selected.
+        """
+        if self.currentItem() is None:
+            return None
+        return self.currentItem().path
 
 class PathItem(QListWidgetItem):
     def __init__(self, path: Path, parent=None):

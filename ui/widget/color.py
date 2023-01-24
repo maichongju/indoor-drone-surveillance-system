@@ -20,6 +20,8 @@ class Color(Enum):
     ANDROID_GREEN = '#A4C639'
     BEE_YELLOW = '#E9AB17'
     BRILLIANT_ROSE = '#F653A6'
+    ZINC_YELLOW = '#F8F32B'
+    PEARL_COPPER = '#763C28'
 
     @property
     def hex(self) -> str:

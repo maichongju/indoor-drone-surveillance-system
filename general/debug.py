@@ -18,7 +18,11 @@ def get_dump_flight_data_file(state: DroneInfo, uri: str, prefix: str = None, fo
 
     file = open(folder + file_name, 'w')
 
-    header = f'time,{state.to_csv_header()},motion.vx,motion.vy,motion.vz,motion.yaw,hover.x,hover.y,hover.z,mode,command,extra'
+    extra_log = DroneExtraLog.to_csv_header()
+
+    header = f'time,{state.to_csv_header()},' \
+             f'motion.vx,motion.vy,motion.vz,motion.yaw,hover.x,hover.y,hover.z,mode,command,' \
+             f'{extra_log}'
 
     print(header, file=file)
     return file
@@ -39,27 +43,38 @@ def get_dump_flight_data_file(state: DroneInfo, uri: str, prefix: str = None, fo
 #     OBSTACLE_DIRECTION = 'obstacle_direction'
 #     OBSTACLE_DISTANCE_AVG = 'obstacle_distance_avg'
 
-class DroneExtraLog:
-    class Flag(str, Enum):
-        MODE = 'mode'
-        HOLD_POS = 'hold_pos'
-        HOLD_CORRECTION = 'hold_correction'
-        CORRECTION = 'correction'
-        AXIS_CHANGE_TO = 'axis_change_to'
-        CURRENT_AXIS = 'current_axis'
-        DISTANCE_TO_TARGET = 'distance_to_target'
-        THRUST_PERCENT = 'thrust_percent'
-        MAINTAIN_DIRECTION_OFFSET = 'maintain_direction_offset'
-        GO_TO_MODE = 'go_to_mode'
-        AVOIDING_OBSTACLE = 'avoiding_obstacle'
-        OBSTACLE_DIRECTION = 'obstacle_direction'
-        OBSTACLE_DISTANCE_AVG = 'obstacle_distance_avg'
+class DroneExtraLog(str, Enum):
+    STATUS = 'status'
+    HOLD_POS = 'hold_pos'
+    HOLD_CORRECTION = 'hold_correction'
+    CORRECTION = 'correction'
+    AXIS_CHANGE_TO = 'axis_change_to'
+    CURRENT_AXIS = 'current_axis'
+    DISTANCE_TO_TARGET = 'distance_to_target'
+    THRUST_PERCENT = 'thrust_percent'
+    MAINTAIN_DIRECTION_OFFSET = 'maintain_direction_offset'
+    GO_TO_MODE = 'go_to_mode'
+    AVOIDING_OBSTACLE = 'avoiding_obstacle'
+    OBSTACLE_DIRECTION = 'obstacle_direction'
+    OBSTACLE_DISTANCE_AVG = 'obstacle_distance_avg'
+    TARGET_POS = 'target_pos'
 
-    def __init__(self):
-        self.log = {}
+    @staticmethod
+    def to_csv_header():
+        """
+        return a string with all the header for the DroneExtraLog
+        """
+        return ','.join([str(log.value) for log in DroneExtraLog])
 
-    def __str__(self):
-        string = ''
-        for f in self.Flag:
-            string += f',{self.log.get(f, None)}'
-        return string
+    @staticmethod
+    def convert_dict_to_csv(data: dict):
+        """
+        Convert a dict to a csv string
+        Args:
+            data: dict to convert
+
+        Returns:
+            csv string
+        """
+
+        return ','.join([f'{data.get(log.value)}' for log in DroneExtraLog])

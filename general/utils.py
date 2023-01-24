@@ -4,6 +4,7 @@ import ipaddress
 import json
 import math
 import re
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
@@ -23,6 +24,14 @@ class Position:
     y: float = 0.0
     z: float = 0.0
 
+    def __init__(self, x: float = 0.0, y: float = 0.0, z: float = 0.0):
+        x = 0.0 if x is None else x
+        y = 0.0 if y is None else y
+        z = 0.0 if z is None else z
+        object.__setattr__(self, 'x', round(x, 2))
+        object.__setattr__(self, 'y', round(y, 2))
+        object.__setattr__(self, 'z', round(z, 2))
+
     @staticmethod
     def from_point2d(point: Point2D) -> Position:
         return Position(point.x, point.y)
@@ -35,11 +44,14 @@ class Position:
     def from_tuple(position: Tuple[float, float, float]) -> Position:
         return Position(position[0], position[1], position[2])
 
-    def distance(self, other: Position) -> float:
+    def distance(self, other: Position, ignore_z: bool = False) -> float:
         if not isinstance(other, Position):
             raise TypeError('other must be Position')
         diff = self - other
-        distance = (diff.x ** 2 + diff.y ** 2 + diff.z ** 2) ** 0.5
+        if not ignore_z:
+            distance = (diff.x ** 2 + diff.y ** 2 + diff.z ** 2) ** 0.5
+        else:
+            distance = (diff.x ** 2 + diff.y ** 2) ** 0.5
         return distance
 
     def round(self, decimal: int = 2):
@@ -123,11 +135,11 @@ class Position:
             return Position(self.x + other, self.y + other, self.z + other)
         return Position(self.x + other.x, self.y + other.y, self.z + other.z)
 
-    def to_csv(self):
+    def to_csv(self, escape: bool = False):
         x = f'{self.x:.3f}' if self.x is not None else 'None'
         y = f'{self.y:.3f}' if self.y is not None else 'None'
         z = f'{self.z:.3f}' if self.z is not None else 'None'
-        return f'{x},{y},{z}'
+        return f'{x},{y},{z}' if not escape else f'"({x},{y},{z})"'
 
     def to_tuple(self):
         return self.x, self.y, self.z
@@ -139,6 +151,10 @@ class Position:
 
         return f"({x}, {y}, {z})"
 
+    def __eq__(self, other):
+        if not isinstance(other, Position):
+            return False
+        return self.x == other.x and self.y == other.y and self.z == other.z
 
 @dataclass
 class AxisDirection:
@@ -192,6 +208,28 @@ class AxisDirection:
             return AxisDirection(Axis.Y, Direction.POSITIVE)
         else:
             return AxisDirection(Axis.X, Direction.NEGATIVE)
+
+    @staticmethod
+    def from_gdirection(gdirection: GDirection) -> AxisDirection:
+        match gdirection:
+            case GDirection.NORTH:
+                return AxisDirection.y_positive()
+            case GDirection.SOUTH:
+                return AxisDirection.y_negative()
+            case GDirection.EAST:
+                return AxisDirection.x_positive()
+            case GDirection.WEST:
+                return AxisDirection.x_negative()
+            case _:
+                raise ValueError(f'Invalid GDirection: {gdirection}')
+
+    def rotate(self, angle: float):
+        shift = int(angle // 90)
+        ccw = True if shift < 0 else True
+        direction = self
+        for _ in range(abs(shift)):
+            direction = direction.rotate_left() if ccw else direction.rotate_right()
+        return direction
 
     def rotate_right(self) -> AxisDirection:
         if not self.is_complete():
@@ -283,6 +321,7 @@ class Axis(Enum):
             return Axis.X
         else:
             return Axis.Z
+
 
 class Direction(IntEnum):
     """Direction of the axis
@@ -420,7 +459,7 @@ def rotate_point(point: tuple[float, float], degree: float, rotate_origin: tuple
 
 def point_relevant_location_yaw(p1: Position, p2: Position, yaw: float) -> GDirection:
     """This function only consider 2d plane. It will return the relevant direction 
-    of the point. this consider the yaw of the drone. WEST means left, EAST means right,
+    of p1. this consider the yaw of the drone. WEST means left, EAST means right,
     Example:
         >>> point_location(Position(1,1), Position(2,1))
         POSITIVE
@@ -448,15 +487,15 @@ def point_relevant_location(p1: Position, p2: Position, yaw: float = 0) -> Tuple
 
     x_axis = GDirection.SAME
     if p2.x > p1.x:
-        x_axis = GDirection.NORTH
+        x_axis = GDirection.EAST
     elif p2.x < p1.x:
-        x_axis = GDirection.SOUTH
+        x_axis = GDirection.WEST
 
     y_axis = GDirection.SAME
     if p2.y > p1.y:
-        y_axis = GDirection.WEST
+        y_axis = GDirection.NORTH
     elif p2.y < p1.y:
-        y_axis = GDirection.EAST
+        y_axis = GDirection.SOUTH
 
     return (x_axis, y_axis)
 
@@ -609,3 +648,23 @@ def is_behind_me(current: Position, target: Position, direction: AxisDirection) 
             return dist.y > 0
         else:
             return dist.y < 0
+
+
+def insert_list_to_list(origin_list: list, insert_list: list, index: int):
+    """
+    Insert the insert_list to the origin_list at the given index
+    Examples:
+    >>> origin_list = [1,2,3,4]
+    >>> insert_list = [5,6]
+    >>> insert_list_to_list(origin_list, insert_list, 2)
+    >>> origin_list
+    [1,2,5,6,3,4]
+    """
+    origin_list[index:index] = insert_list
+
+
+def get_sorted_file_list(path: str, extension: str = None) -> List[Path]:
+    if extension is None:
+        return sorted(Path(path).iterdir(), key=os.path.getmtime)
+    else:
+        return sorted(Path(path).glob(f'*.{extension}'), key=os.path.getmtime)
